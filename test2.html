@@ -12,11 +12,12 @@
   <style>
     body { margin:0; font-family: Arial, sans-serif; }
     #container { display:flex; height:100vh; }
-    #sidebar { width:35%; overflow:auto; padding:10px; background:#f9f9f9; }
+    #sidebar { width:40%; overflow:auto; padding:10px; background:#f9f9f9; }
     #map { flex:1; }
     table { width:100%; border-collapse:collapse; margin-top:10px; }
     th, td { border:1px solid #ccc; padding:5px; font-size:12px; text-align:left; }
     th { background:#eee; }
+    td.personnel span { cursor:pointer; color:blue; text-decoration:underline; }
     .loading { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:#fff; padding:5px 10px; border:1px solid #ccc; }
   </style>
 </head>
@@ -80,7 +81,7 @@ function loadData(){
     skipEmptyLines:true,
     complete:res=>{
       allData = res.data.map(r=>{
-        // Parse Lat/Long from Lat_Long column
+        // Parse Lat/Long
         let lat=null, lng=null;
         if(r["Lat_Long"]){
           const parts = r["Lat_Long"].split(/[, ]+/);
@@ -121,11 +122,9 @@ function loadData(){
 }
 
 function refreshUI(){
-  // Fill filters
   fillFilter("stationFilter", [...new Set(allData.map(d=>d.Station))]);
   fillFilter("shiftFilter", [...new Set(allData.map(d=>d.Shift))]);
   fillFilter("typeFilter", [...new Set(allData.map(d=>d.DeploymentType))]);
-
   renderTable();
   renderMap();
 }
@@ -154,14 +153,17 @@ function getFilteredData(){
 function renderTable(){
   const tbody=document.querySelector("#dataTable tbody");
   tbody.innerHTML="";
-  getFilteredData().forEach(d=>{
+  getFilteredData().forEach((d, idx)=>{
     const tr=document.createElement("tr");
+    const personnelHTML = d.PersonnelList.map((p, i)=>
+      `<span onclick="focusMarker(${idx})">${p.name}</span>`
+    ).join("<br>");
     tr.innerHTML=`
       <td>${d.Station}</td>
       <td>${d.Shift}</td>
       <td>${d.DeploymentType}</td>
       <td>${d.CallSign}</td>
-      <td>${d.PersonnelList.map(p=>p.name).join("<br>")}</td>
+      <td class="personnel">${personnelHTML}</td>
       <td>${d.Communication_Capability}</td>
       <td>${d.Location}</td>
       <td>${d.Photo ? `<img src="${d.Photo}" width="50">` : ""}</td>
@@ -173,7 +175,7 @@ function renderTable(){
 function renderMap(){
   markers.forEach(m=>map.removeLayer(m));
   markers=[];
-  getFilteredData().forEach(d=>{
+  getFilteredData().forEach((d, idx)=>{
     if(d.Lat && d.Lng){
       const marker = L.marker([d.Lat,d.Lng]).addTo(map);
       marker.bindPopup(`
@@ -187,8 +189,18 @@ function renderMap(){
         ${d.Photo ? `<img src="${d.Photo}" width="100">` : ""}
       `);
       markers.push(marker);
+    } else {
+      markers.push(null);
     }
   });
+}
+
+function focusMarker(idx){
+  const d = getFilteredData()[idx];
+  if(d && d.Lat && d.Lng){
+    map.setView([d.Lat, d.Lng], 15, {animate:true});
+    if(markers[idx]) markers[idx].openPopup();
+  }
 }
 
 // Event listeners
@@ -196,11 +208,8 @@ document.getElementById("stationFilter").addEventListener("change", ()=>{renderT
 document.getElementById("shiftFilter").addEventListener("change", ()=>{renderTable();renderMap();});
 document.getElementById("typeFilter").addEventListener("change", ()=>{renderTable();renderMap();});
 
-// Init
 initMap();
 loadData();
-
-// Optional: auto-refresh every 60 seconds
 setInterval(loadData, 60000);
 </script>
 </body>
