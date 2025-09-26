@@ -2,162 +2,206 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>Law Enforcement Deployment Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Deployment Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- PapaParse -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     body { margin:0; font-family: Arial, sans-serif; }
-    #container { display: flex; height: 100vh; }
-    #map { flex: 2; }
-    #sidebar { flex: 1; overflow-y: auto; padding: 10px; background: #f9f9f9; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
-    th, td { border: 1px solid #ccc; padding: 6px; font-size: 13px; text-align: left; }
-    th { background: #eee; }
-    .loading { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-               background: rgba(255,255,255,0.9); padding: 5px 10px; border: 1px solid #ccc; z-index: 1000; }
+    #container { display:flex; height:100vh; }
+    #sidebar { width:35%; overflow:auto; padding:10px; background:#f9f9f9; }
+    #map { flex:1; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border:1px solid #ccc; padding:5px; font-size:12px; text-align:left; }
+    th { background:#eee; }
+    .loading { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:#fff; padding:5px 10px; border:1px solid #ccc; }
   </style>
 </head>
 <body>
 <div id="container">
-  <div id="map"></div>
   <div id="sidebar">
-    <h3>Deployment Details</h3>
-    <div id="deploymentTable"></div>
-    <h3>Personnel Details</h3>
-    <div id="personnelTable"></div>
+    <h2>Deployment Data</h2>
+    <div id="loading" class="loading" style="display:none;">Loading...</div>
+    <div>
+      <label>Filter by Station:</label>
+      <select id="stationFilter"><option value="">All</option></select>
+    </div>
+    <div>
+      <label>Filter by Shift:</label>
+      <select id="shiftFilter"><option value="">All</option></select>
+    </div>
+    <div>
+      <label>Filter by Deployment Type:</label>
+      <select id="typeFilter"><option value="">All</option></select>
+    </div>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Station</th>
+          <th>Shift</th>
+          <th>Type</th>
+          <th>Call Sign</th>
+          <th>Personnel</th>
+          <th>Comm</th>
+          <th>Location</th>
+          <th>Photo</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
+  <div id="map"></div>
 </div>
-<div id="loading" class="loading" style="display:none;">Loading...</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
-  // === CONFIG ===
-  const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLRdvUF4Q7leQXDAZ6fG-e9RTBBqy9eutZ6V70RJLpV6_ForYuRKgfQ24KJVy7MqZkiqn9sRbLTYtL/pub?output=csv";
-  
-  const ICONS = {
-    "Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "Foot Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
-    "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
-  };
+const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLRdvUF4Q7leQXDAZ6fG-e9RTBBqy9eutZ6V70RJLpV6_ForYuRKgfQ24KJVy7MqZkiqn9sRbLTYtL/pub?output=csv";
 
-  // === MAP SETUP ===
-  const map = L.map('map').setView([12.8797, 121.7740], 6); // Center Philippines
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+let map, markers = [], allData = [];
+
+function showLoading(){ document.getElementById("loading").style.display="block"; }
+function hideLoading(){ document.getElementById("loading").style.display="none"; }
+
+function initMap(){
+  map = L.map("map").setView([12, 122], 6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:"&copy; OpenStreetMap contributors"
   }).addTo(map);
-  let markersLayer = L.layerGroup().addTo(map);
+}
 
-  // === HELPERS ===
-  function showLoading(){ document.getElementById('loading').style.display = "block"; }
-  function hideLoading(){ document.getElementById('loading').style.display = "none"; }
-
-  // === DATA ===
-  let allData = [];
-
-  function loadData(){
-    showLoading();
-    const sheetUrl = baseUrl + "&t=" + new Date().getTime(); // prevent caching
-    Papa.parse(sheetUrl, {
-      download:true,
-      header:true,
-      skipEmptyLines:true,
-      complete:res=>{
-        allData = res.data.map(r=>{
-          // Parse Lat/Long
-          let lat = null, lng = null;
-          if(r["Lat_Long"]){
-            const parts = r["Lat_Long"].split(/[, ]+/);
-            if(parts.length >= 2){
-              lat = parseFloat(parts[0]);
-              lng = parseFloat(parts[1]);
-            }
+function loadData(){
+  showLoading();
+  const sheetUrl = baseUrl + "&t=" + new Date().getTime();
+  Papa.parse(sheetUrl, {
+    download:true,
+    header:true,
+    skipEmptyLines:true,
+    complete:res=>{
+      allData = res.data.map(r=>{
+        // Parse Lat/Long from Lat_Long column
+        let lat=null, lng=null;
+        if(r["Lat_Long"]){
+          const parts = r["Lat_Long"].split(/[, ]+/);
+          if(parts.length>=2){
+            lat = parseFloat(parts[0]);
+            lng = parseFloat(parts[1]);
           }
-
-          // Parse personnel
-          let rawPersonnel = (r["Personnel (Rank_FName_MI_LName)"] || "")
-            .split(/[,;\n]+/).map(p => p.trim()).filter(p => p);
-
-          let personnelList = rawPersonnel.map(p => {
-            const match = p.match(/^(.*?)\s*\((\d+)\)$/);
-            if (match) {
-              return { name: match[1].trim(), mobile: match[2] };
-            } else {
-              return { name: p, mobile: "" };
-            }
-          });
-
-          return {
-            ...r,
-            Station: r["Station"],
-            Shift: r["Shift"],
-            DeploymentType: r["Deployment Type"],
-            CallSign: r["Call Sign"],
-            Communication_Capability: r["Communication Capability"],
-            Location: r["Location"],
-            Photo: r["Photo"],
-            PersonnelList: personnelList,
-            Lat: lat,
-            Lng: lng
-          };
+        }
+        // Parse Personnel
+        let rawPersonnel = (r["Personnel (Rank_FName_MI_LName)"] || "")
+          .split(/[,;\n]+/).map(p=>p.trim()).filter(p=>p);
+        let personnelList = rawPersonnel.map(p=>{
+          const match = p.match(/^(.*?)\s*\((\d+)\)$/);
+          if(match){
+            return {name:match[1].trim(), mobile:match[2]};
+          } else {
+            return {name:p, mobile:""};
+          }
         });
-        refreshUI();
-        hideLoading();
-      }
-    });
-  }
-
-  // === REFRESH UI ===
-  function refreshUI(){
-    markersLayer.clearLayers();
-
-    // Deployment Table
-    let depHTML = "<table><tr><th>Station</th><th>Shift</th><th>Deployment</th><th>Call Sign</th><th>Comm</th><th>Location</th></tr>";
-    allData.forEach(r=>{
-      depHTML += `<tr>
-        <td>${r.Station||""}</td>
-        <td>${r.Shift||""}</td>
-        <td>${r.DeploymentType||""}</td>
-        <td>${r.CallSign||""}</td>
-        <td>${r.Communication_Capability||""}</td>
-        <td>${r.Location||""}</td>
-      </tr>`;
-
-      // Add marker
-      if(r.Lat && r.Lng){
-        const marker = L.marker([r.Lat,r.Lng], {icon: ICONS[r.DeploymentType] || ICONS["default"]});
-        let popup = `<b>${r.Station||""}</b><br>Shift: ${r.Shift||""}<br>Deployment: ${r.DeploymentType||""}<br>Call Sign: ${r.CallSign||""}<br>Comm: ${r.Communication_Capability||""}<br>Location: ${r.Location||""}`;
-        if(r.Photo){ popup += `<br><img src="${r.Photo}" alt="Photo" style="width:100px;">`; }
-        marker.bindPopup(popup);
-        markersLayer.addLayer(marker);
-      }
-    });
-    depHTML += "</table>";
-    document.getElementById("deploymentTable").innerHTML = depHTML;
-
-    // Personnel Table
-    let persHTML = "<table><tr><th>Name</th><th>Mobile</th><th>Station</th><th>Deployment</th></tr>";
-    allData.forEach(r=>{
-      r.PersonnelList.forEach(p=>{
-        persHTML += `<tr>
-          <td>${p.name}</td>
-          <td>${p.mobile}</td>
-          <td>${r.Station||""}</td>
-          <td>${r.DeploymentType||""}</td>
-        </tr>`;
+        return {
+          ...r,
+          Station:r["Station"],
+          Shift:r["Shift"],
+          DeploymentType:r["Deployment Type"],
+          CallSign:r["Call Sign"],
+          Communication_Capability:r["Communication Capability"],
+          Location:r["Location"],
+          Photo:r["Photo"],
+          PersonnelList:personnelList,
+          Lat:lat,
+          Lng:lng
+        };
       });
-    });
-    persHTML += "</table>";
-    document.getElementById("personnelTable").innerHTML = persHTML;
-  }
+      refreshUI();
+      hideLoading();
+    }
+  });
+}
 
-  // === AUTO REFRESH ===
-  loadData();
-  setInterval(loadData, 60000); // refresh every 60s
+function refreshUI(){
+  // Fill filters
+  fillFilter("stationFilter", [...new Set(allData.map(d=>d.Station))]);
+  fillFilter("shiftFilter", [...new Set(allData.map(d=>d.Shift))]);
+  fillFilter("typeFilter", [...new Set(allData.map(d=>d.DeploymentType))]);
+
+  renderTable();
+  renderMap();
+}
+
+function fillFilter(id, values){
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All</option>';
+  values.forEach(v=>{
+    if(v) sel.innerHTML += `<option value="${v}">${v}</option>`;
+  });
+  if([...sel.options].some(o=>o.value===current)) sel.value=current;
+}
+
+function getFilteredData(){
+  const sf = document.getElementById("stationFilter").value;
+  const sh = document.getElementById("shiftFilter").value;
+  const tf = document.getElementById("typeFilter").value;
+  return allData.filter(d=>
+    (!sf || d.Station===sf) &&
+    (!sh || d.Shift===sh) &&
+    (!tf || d.DeploymentType===tf)
+  );
+}
+
+function renderTable(){
+  const tbody=document.querySelector("#dataTable tbody");
+  tbody.innerHTML="";
+  getFilteredData().forEach(d=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${d.Station}</td>
+      <td>${d.Shift}</td>
+      <td>${d.DeploymentType}</td>
+      <td>${d.CallSign}</td>
+      <td>${d.PersonnelList.map(p=>p.name).join("<br>")}</td>
+      <td>${d.Communication_Capability}</td>
+      <td>${d.Location}</td>
+      <td>${d.Photo ? `<img src="${d.Photo}" width="50">` : ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderMap(){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+  getFilteredData().forEach(d=>{
+    if(d.Lat && d.Lng){
+      const marker = L.marker([d.Lat,d.Lng]).addTo(map);
+      marker.bindPopup(`
+        <b>${d.Station}</b><br>
+        Shift: ${d.Shift}<br>
+        Type: ${d.DeploymentType}<br>
+        Call Sign: ${d.CallSign}<br>
+        Personnel: ${d.PersonnelList.map(p=>p.name).join(", ")}<br>
+        Comm: ${d.Communication_Capability}<br>
+        Location: ${d.Location}<br>
+        ${d.Photo ? `<img src="${d.Photo}" width="100">` : ""}
+      `);
+      markers.push(marker);
+    }
+  });
+}
+
+// Event listeners
+document.getElementById("stationFilter").addEventListener("change", ()=>{renderTable();renderMap();});
+document.getElementById("shiftFilter").addEventListener("change", ()=>{renderTable();renderMap();});
+document.getElementById("typeFilter").addEventListener("change", ()=>{renderTable();renderMap();});
+
+// Init
+initMap();
+loadData();
+
+// Optional: auto-refresh every 60 seconds
+setInterval(loadData, 60000);
 </script>
 </body>
 </html>
