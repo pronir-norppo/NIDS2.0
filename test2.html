@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; }
+    #container { display: flex; height: 100vh; }
+    #map { flex: 2; }
+    #sidebar { flex: 1; overflow-y: auto; padding: 10px; background: #f9f9f9; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
+    th, td { border: 1px solid #ccc; padding: 6px; font-size: 13px; text-align: left; }
+    th { background: #eee; }
+    .loading { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+               background: rgba(255,255,255,0.9); padding: 5px 10px; border: 1px solid #ccc; z-index: 1000; }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="map"></div>
+  <div id="sidebar">
+    <h3>Deployment Details</h3>
+    <div id="deploymentTable"></div>
+    <h3>Personnel Details</h3>
+    <div id="personnelTable"></div>
+  </div>
+</div>
+<div id="loading" class="loading" style="display:none;">Loading...</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+  // === CONFIG ===
+  const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLRdvUF4Q7leQXDAZ6fG-e9RTBBqy9eutZ6V70RJLpV6_ForYuRKgfQ24KJVy7MqZkiqn9sRbLTYtL/pub?output=csv";
+  
+  const ICONS = {
+    "Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "Foot Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
+    "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
+  };
+
+  // === MAP SETUP ===
+  const map = L.map('map').setView([12.8797, 121.7740], 6); // Center Philippines
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  let markersLayer = L.layerGroup().addTo(map);
+
+  // === HELPERS ===
+  function showLoading(){ document.getElementById('loading').style.display = "block"; }
+  function hideLoading(){ document.getElementById('loading').style.display = "none"; }
+
+  // === DATA ===
+  let allData = [];
+
+  function loadData(){
+    showLoading();
+    const sheetUrl = baseUrl + "&t=" + new Date().getTime(); // prevent caching
+    Papa.parse(sheetUrl, {
+      download:true,
+      header:true,
+      skipEmptyLines:true,
+      complete:res=>{
+        allData = res.data.map(r=>{
+          // Parse Lat/Long
+          let lat = null, lng = null;
+          if(r["Lat_Long"]){
+            const parts = r["Lat_Long"].split(/[, ]+/);
+            if(parts.length >= 2){
+              lat = parseFloat(parts[0]);
+              lng = parseFloat(parts[1]);
+            }
+          }
+
+          // Parse personnel
+          let rawPersonnel = (r["Personnel (Rank_FName_MI_LName)"] || "")
+            .split(/[,;\n]+/).map(p => p.trim()).filter(p => p);
+
+          let personnelList = rawPersonnel.map(p => {
+            const match = p.match(/^(.*?)\s*\((\d+)\)$/);
+            if (match) {
+              return { name: match[1].trim(), mobile: match[2] };
+            } else {
+              return { name: p, mobile: "" };
+            }
+          });
+
+          return {
+            ...r,
+            Station: r["Station"],
+            Shift: r["Shift"],
+            DeploymentType: r["Deployment Type"],
+            CallSign: r["Call Sign"],
+            Communication_Capability: r["Communication Capability"],
+            Location: r["Location"],
+            Photo: r["Photo"],
+            PersonnelList: personnelList,
+            Lat: lat,
+            Lng: lng
+          };
+        });
+        refreshUI();
+        hideLoading();
+      }
+    });
+  }
+
+  // === REFRESH UI ===
+  function refreshUI(){
+    markersLayer.clearLayers();
+
+    // Deployment Table
+    let depHTML = "<table><tr><th>Station</th><th>Shift</th><th>Deployment</th><th>Call Sign</th><th>Comm</th><th>Location</th></tr>";
+    allData.forEach(r=>{
+      depHTML += `<tr>
+        <td>${r.Station||""}</td>
+        <td>${r.Shift||""}</td>
+        <td>${r.DeploymentType||""}</td>
+        <td>${r.CallSign||""}</td>
+        <td>${r.Communication_Capability||""}</td>
+        <td>${r.Location||""}</td>
+      </tr>`;
+
+      // Add marker
+      if(r.Lat && r.Lng){
+        const marker = L.marker([r.Lat,r.Lng], {icon: ICONS[r.DeploymentType] || ICONS["default"]});
+        let popup = `<b>${r.Station||""}</b><br>Shift: ${r.Shift||""}<br>Deployment: ${r.DeploymentType||""}<br>Call Sign: ${r.CallSign||""}<br>Comm: ${r.Communication_Capability||""}<br>Location: ${r.Location||""}`;
+        if(r.Photo){ popup += `<br><img src="${r.Photo}" alt="Photo" style="width:100px;">`; }
+        marker.bindPopup(popup);
+        markersLayer.addLayer(marker);
+      }
+    });
+    depHTML += "</table>";
+    document.getElementById("deploymentTable").innerHTML = depHTML;
+
+    // Personnel Table
+    let persHTML = "<table><tr><th>Name</th><th>Mobile</th><th>Station</th><th>Deployment</th></tr>";
+    allData.forEach(r=>{
+      r.PersonnelList.forEach(p=>{
+        persHTML += `<tr>
+          <td>${p.name}</td>
+          <td>${p.mobile}</td>
+          <td>${r.Station||""}</td>
+          <td>${r.DeploymentType||""}</td>
+        </tr>`;
+      });
+    });
+    persHTML += "</table>";
+    document.getElementById("personnelTable").innerHTML = persHTML;
+  }
+
+  // === AUTO REFRESH ===
+  loadData();
+  setInterval(loadData, 60000); // refresh every 60s
+</script>
+</body>
+</html>
