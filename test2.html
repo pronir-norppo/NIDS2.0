@@ -97,3 +97,168 @@
     </div>
   </div>
   <div id="loadingOverlay"><div class="spinner"></div></div>
+
+  <script>
+    const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRLRdvUF4Q7leQXDAZ6fG-e9RTBBqy9eutZ6V70RJLpV6_ForYuRKgfQ24KJVy7MqZkiqn9sRbLTYtL/pub?output=csv";
+    const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVuN46_LsWvxmi69hgYHLR-CyTwIDBg2-T2dQ9hhxEutKQD4WjzMRSeP3Dsn6V-951XoakmsGP-3jg/pub?output=csv";
+    const FOCUS_CRIMES = ["Murder", "Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
+
+    const ICONS = {
+      "Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "Foot/Beat Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
+      "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
+    };
+
+    let allData = [], crimeData = [], markers=[];
+    let selectedStation="All", selectedShift="All", selectedType="All", selectedCrime=null;
+    let personnelExpanded=false;
+
+    const defaultCenter = [9.3, 123.2];
+    const defaultZoom = 9;
+
+    const map = L.map('map').setView(defaultCenter, defaultZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; <b>NOPPO PICTMU</b> - OpenStreet Map' }).addTo(map);
+
+    const stationSelect=document.getElementById("stationFilter");
+    const shiftSelect=document.getElementById("shiftFilter");
+    const typeSelect=document.getElementById("typeFilter");
+    const crimeTbody=document.querySelector("#crimeTable tbody");
+    const personnelTbody=document.querySelector("#personnelTable tbody");
+    const loadingOverlay=document.getElementById("loadingOverlay");
+    const summaryBox=document.getElementById("summaryBox");
+    const personnelContainer=document.getElementById("personnelContainer");
+    const toggleLink=document.getElementById("togglePersonnel");
+
+    function showLoading(){loadingOverlay.classList.add("active");}
+    function hideLoading(){setTimeout(()=>loadingOverlay.classList.remove("active"),200);}
+
+    function normalize(s){return (s||"").toString().trim().toLowerCase();}
+
+    function loadData(){
+      showLoading();
+      let p1=new Promise(res=>Papa.parse(DEPLOYMENT_SHEET_CSV+"?t="+Date.now(),{download:true,header:true,skipEmptyLines:true,complete:r=>res(r.data)}));
+      let p2=new Promise(res=>Papa.parse(CRIME_SHEET_CSV+"?t="+Date.now(),{download:true,header:true,skipEmptyLines:true,complete:r=>res(r.data)}));
+
+      Promise.all([p1,p2]).then(([deploy,crimes])=>{
+        allData=deploy.map(r=>{
+          let lat=null,lng=null;
+          if(r["Lat_Long"]){const parts=r["Lat_Long"].split(/[, ]+/);if(parts.length>=2){lat=parseFloat(parts[0]);lng=parseFloat(parts[1]);}}
+          let rawPersonnel=(r["Personnel (Rank_FName_MI_LName)"]||"").split(/[,;\n]+/).map(p=>p.trim()).filter(p=>p);
+          let personnelList=rawPersonnel.map(p=>{const match=p.match(/^(.*?)\s*\((\d+)\)$/);if(match){return {name:match[1].trim(),mobile:match[2]};}else{return {name:p,mobile:""};}});
+          return {...r,Station:r["Station"],Shift:r["Shift"],DeploymentType:r["Deployment Type"],CallSign:r["Call Sign"],Communication_Capability:r["Communication Capability"],Location:r["Location"],Photo:r["Photo"],PersonnelList:personnelList,Lat:lat,Lng:lng};
+        });
+        crimeData=crimes;
+        refreshUI();hideLoading();
+      });
+    }
+
+    function refreshUI(){
+      markers.forEach(m=>map.removeLayer(m));markers=[];
+
+      allData.forEach(r=>{
+        const icon=ICONS[r.DeploymentType]||ICONS.default;
+        if(r.Lat && r.Lng){
+          const m=L.marker([r.Lat,r.Lng],{icon}).addTo(map);
+          m.row=r;
+          let nameListHtml=r.PersonnelList.map((p,i)=>{return `&nbsp;&nbsp;&nbsp;${i+1}. ${p.name}`;}).join("<br>");
+          m.bindPopup(`<b>Unit:</b> ${r.Station}<br><b>Name:</b><br>${nameListHtml}<br><br><b>Call Sign:</b> ${r.CallSign}<br><b>Communication:</b> ${r.Communication_Capability}<br><b>Shift:</b> ${r.Shift}<br><b>Patrol Area:</b> ${r.Location}<br>${r.Photo?`<img src="${r.Photo}" width="120">`:""}`);
+          markers.push(m);
+        }
+      });
+
+      const stationList=[...new Set(allData.map(d=>d.Station))].sort((a,b)=>a.localeCompare(b));
+      populateDropdown(stationSelect,["All",...stationList],selectedStation);
+      shiftSelect.innerHTML='<option value="All">All</option>';shiftSelect.disabled=true;
+      typeSelect.innerHTML='<option value="All">All</option>';typeSelect.disabled=true;
+      applyFilters();
+    }
+
+    function populateDropdown(el,vals,preserved){
+      el.innerHTML="";vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;el.appendChild(o);});el.value=vals.includes(preserved)?preserved:"All";
+    }
+
+    function applyFilters(){
+      showLoading();
+      let data=allData.filter(d=>(stationSelect.value==="All"||normalize(d.Station)===normalize(stationSelect.value))&&(shiftSelect.value==="All"||d.Shift===shiftSelect.value)&&(typeSelect.value==="All"||d.DeploymentType===typeSelect.value));
+      renderCrimeTable(data);
+      renderPersonnelTable(data);
+      updateMarkerOpacity(data);
+      updateSummaryBox(data);
+      hideLoading();
+    }
+
+    function renderCrimeTable(data){
+      crimeTbody.innerHTML="";
+      if(stationSelect.value==="All"){
+        const counts={};
+        crimeData.forEach(c=>{if(c["Focus Crimes"]){counts[c["Focus Crimes"]]=(counts[c["Focus Crimes"]]||0)+1;}});
+        FOCUS_CRIMES.forEach(c=>{const tr=document.createElement("tr");tr.className="crime-row";if((counts[c]||0)===0)tr.classList.add("muted");tr.innerHTML=`<td>${c}</td><td>(select a station)</td><td>-</td><td><center>${counts[c]||0}</center></td>`;crimeTbody.appendChild(tr);});
+      }else{
+        const counts={};
+        crimeData.forEach(c=>{
+          if(normalize(c.Stations)===normalize(stationSelect.value)){
+            if(c["Focus Crimes"]&&c.Barangay){
+              const key=c["Focus Crimes"]+"|"+c.Barangay+"|"+(c["Case Status"]||"");
+              counts[key]=(counts[key]||0)+1;
+            }
+          }
+        });
+        Object.entries(counts).forEach(([key,count])=>{const [crime,barangay,status]=key.split("|");const tr=document.createElement("tr");tr.className="crime-row";tr.innerHTML=`<td>${crime}</td><td>${barangay}</td><td>${status}</td><td><center>${count}</center></td>`;crimeTbody.appendChild(tr);});
+        if(!crimeTbody.children.length){crimeTbody.innerHTML="<tr><td colspan=4>No crimes</td></tr>";}
+      }
+    }
+
+    function renderPersonnelTable(rows){
+      personnelTbody.innerHTML="";
+      if(!rows.length){personnelTbody.innerHTML=`<tr><td colspan=2>No personnel</td></tr>`;toggleLink.style.display="none";return;}
+      const visibleRows=personnelExpanded?rows:rows.slice(0,5);
+      visibleRows.forEach(r=>{const tr=document.createElement("tr");tr.className="person-row";let namesOnly=r.PersonnelList.map(p=>p.name).join(", ");tr.innerHTML=`<td>${namesOnly}</td><td>${r.CallSign}</td>`;tr.onclick=()=>{const f=markers.find(m=>m.row&&m.row.CallSign===r.CallSign&&normalize(m.row.Station)===normalize(r.Station));if(f){map.flyTo(f.getLatLng(),15);f.openPopup();}};personnelTbody.appendChild(tr);});
+      if(rows.length>5){toggleLink.style.display="inline-block";toggleLink.textContent=personnelExpanded?"Show less":"Show more";}else{toggleLink.style.display="none";}
+      if(personnelExpanded){personnelContainer.classList.add("expanded");}else{personnelContainer.classList.remove("expanded");}
+    }
+
+    function updateMarkerOpacity(rows){
+      const set=new Set(rows.map(r=>r.CallSign));markers.forEach(m=>{const el=m.getElement();if(!el)return;if(set.has(m.row?.CallSign)){el.style.opacity=1;el.style.pointerEvents="auto";}else{if(stationSelect.value!=="All"){el.style.opacity=0.5;el.style.pointerEvents="none";}else{el.style.opacity=1;el.style.pointerEvents="auto";}}});
+    }
+
+    function updateSummaryBox(rows){
+      if(!rows.length){summaryBox.innerHTML="No personnel";return;}
+      let byShift={};rows.forEach(r=>{byShift[r.Shift]=(byShift[r.Shift]||0)+1;});
+      let html="<table><tr><td>Total</td><td>"+rows.length+"</td></tr>";
+      Object.entries(byShift).forEach(([t,c])=>{html+="<tr><td>"+t+"</td><td>"+c+"</td></tr>";});
+      html+="</table>";summaryBox.innerHTML=html;
+    }
+
+    stationSelect.onchange=()=>{selectedStation=stationSelect.value;selectedCrime=null;
+      if(selectedStation==="All"){
+        shiftSelect.innerHTML='<option value="All">All</option>';shiftSelect.value="All";shiftSelect.disabled=true;selectedShift="All";
+        typeSelect.innerHTML='<option value="All">All</option>';typeSelect.value="All";typeSelect.disabled=true;selectedType="All";
+      } else {
+        const availableShifts=[...new Set(allData.filter(d=>normalize(d.Station)===normalize(selectedStation)).map(d=>d.Shift))];
+        shiftSelect.innerHTML='<option value="All">All</option>';availableShifts.forEach(s=>{const opt=document.createElement("option");opt.value=s;opt.textContent=s;shiftSelect.appendChild(opt);});
+        shiftSelect.disabled=false;shiftSelect.value="All";selectedShift="All";
+        const availableTypes=[...new Set(allData.filter(d=>normalize(d.Station)===normalize(selectedStation)).map(d=>d.DeploymentType))];
+        typeSelect.innerHTML='<option value="All">All</option>';availableTypes.forEach(s=>{const opt=document.createElement("option");opt.value=s;opt.textContent=s;typeSelect.appendChild(opt);});
+        typeSelect.disabled=false;typeSelect.value="All";selectedType="All";
+      }
+      applyFilters();
+    };
+
+    shiftSelect.onchange=()=>{selectedShift=shiftSelect.value;applyFilters();};
+    typeSelect.onchange=()=>{selectedType=typeSelect.value;applyFilters();};
+    toggleLink.onclick=()=>{personnelExpanded=!personnelExpanded;applyFilters();};
+    document.getElementById("refreshBtn").onclick=()=>{
+      selectedStation="All";selectedShift="All";selectedType="All";selectedCrime=null;
+      stationSelect.value="All";shiftSelect.value="All";shiftSelect.disabled=true;typeSelect.value="All";typeSelect.disabled=true;
+      map.setView(defaultCenter,defaultZoom);
+      loadData();
+    };
+
+    loadData();
+  </script>
+</body>
+</html>
