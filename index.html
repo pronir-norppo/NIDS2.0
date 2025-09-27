@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS 2.0</title>
+  <title>NIDS 2.0 - Fixed</title>
   <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -135,7 +135,7 @@
 
 .popup-photo img {
   max-width: 100%;
-  max-height: 200%;
+  max-height: 200px;
   display: block;
   border-radius: 8px;
   border: 1px solid #333;
@@ -143,8 +143,8 @@
 
 /* Force popup images to show properly */
 .leaflet-popup-content .popup-photo img {
-  max-width: 240px !important;
-  max-height: 240px !important;
+  max-width: 160px !important;
+  max-height: 160px !important;
   display: block;
   border-radius: 8px;
   border: 1px solid #333;
@@ -204,7 +204,8 @@ const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfV
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
 const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/150";
+const FALLBACK_TEST_IMAGE = "https://i.imgur.com/7mu4J9W.jpg"; // Reliable Imgur image
+const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -229,6 +230,7 @@ let displayedMarkers = [];
 let highlightLayer = null;
 let selectedRowEl = null;
 let personnelExpanded = false;
+const imageCache = new Map(); // Cache for loaded images
 
 const stationSelect = document.getElementById("stationFilter");
 const shiftSelect   = document.getElementById("shiftFilter");
@@ -339,7 +341,7 @@ async function loadData(){
   try{
     const [depRows, crimeRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV) ]);
 
-    // Preload images
+    // Preload images and store in cache
     const imageUrls = depRows
       .map(r => {
         let url = "";
@@ -378,8 +380,11 @@ async function loadData(){
     imageUrls.forEach(url => {
       const img = new Image();
       img.src = url;
-      img.onload = () => console.log("[PRELOAD] Loaded:", url);
-      img.onerror = () => console.log("[PRELOAD] Failed:", url);
+      img.onload = () => {
+        console.log("[PRELOAD] Loaded:", url, "Time:", new Date().toISOString());
+        imageCache.set(url, url); // Cache the URL
+      };
+      img.onerror = () => console.log("[PRELOAD] Failed:", url, "Time:", new Date().toISOString());
     });
 
     allData = depRows.map((r, idx) => {
@@ -415,7 +420,7 @@ async function loadData(){
           console.log("[PHOTO RAW]", url);
 
           if (url.includes("drive.google.com/file/d/")) {
-            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            const match = url.match(/\/d\/([a-zAZ0-9_-]+)/);
             if (match && match[1]) {
               url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
               console.log("[PHOTO FIXED FILE]", url);
@@ -507,9 +512,9 @@ function applyFilters(){
       const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
       console.log("[POPUP IMG VALUE]", r.Photo, r);
 
-      // Use raw URL for idx===1, fallback test image for idx===0, proxy for others
-      const imgSrc = idx === 0 ? FALLBACK_TEST_IMAGE : 
-        (idx === 1 ? r.Photo.replace(/&amp;/g, '&') : 
+      // Image selection: static for idx===0, Imgur for idx===1, proxy for Google Drive, raw for others
+      const imgSrc = idx === 0 ? STATIC_TEST_IMAGE : 
+        (idx === 1 ? FALLBACK_TEST_IMAGE : 
         (r.Photo.includes('drive.google.com') ? 
           `${CORS_PROXY}${encodeURIComponent(r.Photo.replace(/&amp;/g, '&'))}` : 
           r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG));
@@ -543,10 +548,10 @@ function applyFilters(){
       }
     </div>
     <div class="popup-photo loading">
-      <img src="${imgSrc}" 
+      <img src="${imageCache.get(imgSrc) || imgSrc}" 
            alt="photo"
            onload="console.log('[IMG LOADED]', this.src, 'Time:', new Date().toISOString()); this.parentNode.classList.remove('loading');"
-           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
+           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); setTimeout(() => { this.src = '${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading'); }, 10000);">
     </div>
   </div>
 `;
@@ -555,12 +560,28 @@ function applyFilters(){
       const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
         maxWidth: 400,
         minWidth: 250,
-        className: "custom-popup"
+        className: "custom-popup",
+        autoClose: false,
+        keepInView: true
       });
 
-      // Log popup open without forced image reload
       marker.on('popupopen', function() {
         console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc, "Time:", new Date().toISOString());
+        const img = document.querySelector('.leaflet-popup-content .popup-photo img');
+        if (img && !img.complete && !imageCache.get(imgSrc)) {
+          console.log("[POPUP OPEN] Image not loaded, setting timeout for", imgSrc);
+          setTimeout(() => {
+            if (!img.complete) {
+              console.log("[IMG TIMEOUT] Fallback for", imgSrc, "Time:", new Date().toISOString());
+              img.src = PLACEHOLDER_IMG;
+              img.parentNode.classList.remove('loading');
+            }
+          }, 10000);
+        }
+      });
+
+      marker.on('popupclose', function() {
+        console.log("[POPUP CLOSE] Marker:", r.Station, "Time:", new Date().toISOString());
       });
 
       marker.addTo(map);
@@ -793,7 +814,7 @@ loadData();
    ===========================
 */
 window.__nids_debug = {
-  allData, crimeData,
+  allData, crimeData, imageCache,
   reload: loadData,
   refreshUI,
   applyFilters,
