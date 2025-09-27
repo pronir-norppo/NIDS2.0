@@ -200,6 +200,17 @@ const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Th
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
 
+const ICONS = {
+  "Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Foot Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
+};
+
+	
 /* ===========================
    STATE & DOM REFERENCES
    ===========================
@@ -521,11 +532,13 @@ function applyFilters(){
 
 
       // create marker and attach meta
-    const marker = L.marker([r.Lat, r.Lng]).bindPopup(popupHtml, {
+const icon = ICONS[r["Deployment Type"]] || ICONS["default"];
+const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
   maxWidth: 400,
   minWidth: 250,
   className: "custom-popup"
 });
+
       marker.addTo(map);
       displayedMarkers.push({ marker, deployment: r });
       bounds.push([r.Lat, r.Lng]);
