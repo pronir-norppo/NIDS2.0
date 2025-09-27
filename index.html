@@ -204,7 +204,7 @@ const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfV
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
 const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-const FALLBACK_TEST_IMAGE = "https://i.imgur.com/O5XhX8W.jpg"; // New verified Imgur image
+const FALLBACK_TEST_IMAGE = "https://i.imgur.com/O5XhX8W.jpg"; // Verified Imgur image
 const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
@@ -520,48 +520,85 @@ function applyFilters(){
           r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG));
       console.log("[POPUP IMG SRC]", imgSrc);
 
-      let popupHtml = `
-  <div class="popup-card">
-    <div class="popup-header">
-      <h3>${escapeHtml(r.Station || "Unknown Unit")}</h3>
-    </div>
-    ${r.Location ? `<div class="popup-row"><b>Patrol Area:</b> ${escapeHtml(r.Location)}</div>` : ""}
-    ${r.Shift ? `<div class="popup-row"><b>Shift:</b> ${escapeHtml(r.Shift)}</div>` : ""}
-    ${r["Deployment Type"] ? `<div class="popup-row"><b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}</div>` : ""}
-	${r.CallSign ? `<span class="popup-callsign"><b>Callsign</b>: ${escapeHtml(r.CallSign)}</span>` : ""}
-    <hr>
-    <div class="popup-people">
-      ${
-        Array.isArray(r.PersonnelList) && r.PersonnelList.length
-          ? r.PersonnelList.map((p, idx) => {
-              const name = p.name || r.Name || ("Person " + (idx+1));
-              const mobile = p.mobile || "";
-              const contactHtml = mobile
-                ? makeContactLinks(mobile)
-                : `<span style="opacity:0.6">no mobile</span>`;
-              return `<div class="popup-person">
-                        <span class="person-name">${escapeHtml(name)}</span><br>
-                        ${contactHtml}
-                      </div>`;
-            }).join("")
-          : `<div class="popup-person"><strong>${escapeHtml(r.Name || "Unnamed")}</strong></div>`
+      // Create popup content as DOM elements
+      const popupDiv = document.createElement('div');
+      popupDiv.className = 'popup-card';
+      
+      const header = document.createElement('div');
+      header.className = 'popup-header';
+      const h3 = document.createElement('h3');
+      h3.textContent = r.Station || 'Unknown Unit';
+      header.appendChild(h3);
+      popupDiv.appendChild(header);
+
+      if (r.Location) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Patrol Area:</b> ${escapeHtml(r.Location)}`;
+        popupDiv.appendChild(row);
       }
-    </div>
-    <div class="popup-photo loading">
-      <img src="${imageCache.get(imgSrc) || imgSrc}" 
-           alt="photo"
-           onload="console.log('[IMG LOADED]', this.src, 'Time:', new Date().toISOString()); this.parentNode.classList.remove('loading');"
-           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); setTimeout(() => { this.src = '${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading'); }, 15000);">
-    </div>
-  </div>
-`;
+      if (r.Shift) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Shift:</b> ${escapeHtml(r.Shift)}`;
+        popupDiv.appendChild(row);
+      }
+      if (r["Deployment Type"]) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}`;
+        popupDiv.appendChild(row);
+      }
+      if (r.CallSign) {
+        const callsign = document.createElement('span');
+        callsign.className = 'popup-callsign';
+        callsign.innerHTML = `<b>Callsign</b>: ${escapeHtml(r.CallSign)}`;
+        popupDiv.appendChild(callsign);
+      }
+
+      const hr = document.createElement('hr');
+      popupDiv.appendChild(hr);
+
+      const peopleDiv = document.createElement('div');
+      peopleDiv.className = 'popup-people';
+      if (Array.isArray(r.PersonnelList) && r.PersonnelList.length) {
+        r.PersonnelList.forEach((p, idx) => {
+          const personDiv = document.createElement('div');
+          personDiv.className = 'popup-person';
+          const name = p.name || r.Name || ("Person " + (idx+1));
+          const mobile = p.mobile || "";
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'person-name';
+          nameSpan.textContent = name;
+          personDiv.appendChild(nameSpan);
+          personDiv.appendChild(document.createElement('br'));
+          personDiv.innerHTML += mobile ? makeContactLinks(mobile) : `<span style="opacity:0.6">no mobile</span>`;
+          peopleDiv.appendChild(personDiv);
+        });
+      } else {
+        const personDiv = document.createElement('div');
+        personDiv.className = 'popup-person';
+        personDiv.innerHTML = `<strong>${escapeHtml(r.Name || "Unnamed")}</strong>`;
+        peopleDiv.appendChild(personDiv);
+      }
+      popupDiv.appendChild(peopleDiv);
+
+      const photoDiv = document.createElement('div');
+      photoDiv.className = 'popup-photo loading';
+      const img = document.createElement('img');
+      img.src = imageCache.get(imgSrc) || imgSrc;
+      img.alt = 'photo';
+      img.onload = () => {
+        console.log('[IMG LOADED]', img.src, 'Time:', new Date().toISOString());
+        photoDiv.classList.remove('loading');
+      };
+      photoDiv.appendChild(img);
+      popupDiv.appendChild(photoDiv);
 
       const icon = ICONS[r["Deployment Type"] || "default"];
       const marker = L.marker([r.Lat, r.Lng], { icon });
 
       // Bind popup as static DOM element
-      const popupDiv = document.createElement('div');
-      popupDiv.innerHTML = popupHtml;
       marker.bindPopup(popupDiv, {
         maxWidth: 400,
         minWidth: 250,
@@ -570,23 +607,37 @@ function applyFilters(){
         keepInView: true
       });
 
+      // MutationObserver to detect popup content changes
       marker.on('popupopen', function() {
         console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc, "Time:", new Date().toISOString());
-        const img = popupDiv.querySelector('.popup-photo img');
-        if (img && !img.complete && !imageCache.get(imgSrc)) {
-          console.log("[POPUP OPEN] Image not loaded, setting timeout for", imgSrc);
-          setTimeout(() => {
-            if (!img.complete) {
-              console.log("[IMG TIMEOUT] Fallback for", imgSrc, "Time:", new Date().toISOString());
-              img.src = PLACEHOLDER_IMG;
-              img.parentNode.classList.remove('loading');
-            }
-          }, 15000);
+        const popupContent = document.querySelector('.leaflet-popup-content');
+        if (popupContent) {
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach(m => {
+              console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Time:", new Date().toISOString());
+            });
+          });
+          observer.observe(popupContent, { childList: true, subtree: true, attributes: true });
+          if (!img.complete && !imageCache.get(imgSrc)) {
+            console.log("[POPUP OPEN] Image not loaded, setting timeout for", imgSrc);
+            setTimeout(() => {
+              if (!img.complete) {
+                console.log("[IMG TIMEOUT] Fallback for", imgSrc, "Time:", new Date().toISOString());
+                img.src = PLACEHOLDER_IMG;
+                photoDiv.classList.remove('loading');
+              }
+            }, 20000);
+          }
         }
       });
 
       marker.on('popupclose', function() {
         console.log("[POPUP CLOSE] Marker:", r.Station, "Time:", new Date().toISOString());
+      });
+
+      // Log map events
+      map.on('popupopen popupclose moveend zoomend', (e) => {
+        console.log("[MAP EVENT] Type:", e.type, "Time:", new Date().toISOString());
       });
 
       marker.addTo(map);
