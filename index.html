@@ -23,7 +23,7 @@
     th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
     th{background:#2a2a2a;color:var(--gold);text-align:left}
     .crime-row{cursor:default}
-    .crime-row.muted{opacity:0.35; pointer-events: none;} /* muted rows are unclickable */
+    .crime-row.muted{opacity:0.35; pointer-events: none;}
     .person-row{cursor:pointer}
     .person-row.muted{opacity:0.45}
     .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
@@ -58,6 +58,14 @@
 .popup-photo { margin-top:8px; }
 .popup-photo img { display:block; max-width:160px; border-radius:6px; }
 
+.popup-photo.loading::before {
+  content: 'Loading image...';
+  display: block;
+  text-align: center;
+  color: #fff;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
 	
 	/* Stylish popup card */
 .leaflet-popup-content-wrapper.custom-popup {
@@ -83,7 +91,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
 }
 
 .popup-header h3 {
@@ -196,6 +203,7 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
+const CORS_PROXY = "https://cors-anywhere.herokuapp.com/";
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -210,16 +218,15 @@ const ICONS = {
   "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
 };
 
-	
 /* ===========================
    STATE & DOM REFERENCES
    ===========================
 */
-let allData = [];         // parsed deployments (each deployment row)
-let crimeData = [];       // parsed crimes
-let displayedMarkers = []; // markers on map (one per deployment)
-let highlightLayer = null; // golden highlight marker
-let selectedRowEl = null;  // currently selected <tr> in personnel table
+let allData = [];
+let crimeData = [];
+let displayedMarkers = [];
+let highlightLayer = null;
+let selectedRowEl = null;
 let personnelExpanded = false;
 
 const stationSelect = document.getElementById("stationFilter");
@@ -261,13 +268,10 @@ function parseLatLngFromRow(r){
     return "";
   };
 
-  // Combined field candidates
   let combined = tryVals(["Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng"]);
-  // Individual fields
   let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT"]);
   let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon"]);
 
-  // If combined present and contains two numbers, split
   if(combined){
     const parts = combined.split(/[,\/\s]+/).map(p=>p.trim()).filter(Boolean);
     if(parts.length >= 2){
@@ -276,7 +280,6 @@ function parseLatLngFromRow(r){
     }
   }
 
-  // If latVal contains two numbers (e.g., "9.5, 123.6"), split
   if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
     const ps = latVal.split(/[,\/\s]+/).map(p=>p.trim()).filter(Boolean);
     if(ps.length>=2){ const a=parseFloat(ps[0]), b=parseFloat(ps[1]); if(!isNaN(a) && !isNaN(b)) { latVal = ps[0]; lngVal = ps[1]; } }
@@ -285,7 +288,6 @@ function parseLatLngFromRow(r){
   let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
   let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
 
-  // Heuristic: if values are swapped (common), swap
   function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
   function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
 
@@ -305,7 +307,6 @@ function escapeHtml(s){ return (s||"").toString().replace(/[&<>"']/g, function(m
 function makeContactLinks(mobile){
   const cleaned = (mobile||"").toString().replace(/\s+/g,'');
   if(!cleaned) return '';
-  // Ensure leading + for tel/viber if local starts with 0 (common PH mobile 09.. -> +639..)
   let plusNum = cleaned;
   if(/^0\d+/.test(cleaned)) plusNum = "+63" + cleaned.slice(1);
   if(/^\d{10,}$/.test(cleaned) && !/^\+/.test(plusNum)) plusNum = "+" + plusNum;
@@ -329,9 +330,6 @@ function fetchCsv(url){
 
 /* ===========================
    LOAD & NORMALIZE DATA
-   - Keep raw row for debugging
-   - Parse personnel list to objects {name,mobile}
-   - Parse lat/lng robustly
    ===========================
 */
 async function loadData(){
@@ -339,28 +337,62 @@ async function loadData(){
   console.log("[LOAD] Starting fetch of CSVs...");
   try{
     const [depRows, crimeRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV) ]);
-    console.log("[LOAD] Raw deployment rows sample:", depRows.slice(0,5));
-    console.log("[LOAD] Raw crime rows sample:", crimeRows.slice(0,5));
+
+    // Preload images
+    const imageUrls = depRows
+      .map(r => {
+        let url = "";
+        const keys = ["Photo", "photo", "PHOTO", "Photo URL", "Image", "Photo Link", "Image URL"];
+        for (const k of keys) {
+          if (r[k]) { url = r[k]; break; }
+        }
+        url = url.toString().trim();
+        console.log("[PHOTO RAW]", url);
+
+        if (url.includes("drive.google.com/file/d/")) {
+          const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+          if (match && match[1]) {
+            url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+            console.log("[PHOTO FIXED FILE]", url);
+          }
+        } else if (url.includes("drive.google.com/open?id=")) {
+          const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+          if (match && match[1]) {
+            url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+            console.log("[PHOTO FIXED OPEN]", url);
+          }
+        } else if (url.includes("drive.google.com")) {
+          const match = url.match(/([a-zA-Z0-9_-]{25,44})/);
+          if (match && match[1]) {
+            url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+            console.log("[PHOTO FIXED GENERIC]", url);
+          }
+        }
+
+        console.log("[PHOTO FINAL]", url || PLACEHOLDER_IMG);
+        return url || PLACEHOLDER_IMG;
+      })
+      .filter(url => url !== PLACEHOLDER_IMG);
+
+    imageUrls.forEach(url => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => console.log("[PRELOAD] Loaded:", url);
+      img.onerror = () => console.log("[PRELOAD] Failed:", url);
+    });
 
     allData = depRows.map((r, idx) => {
       const { lat, lng } = parseLatLngFromRow(r);
 
-      // Personnel parsing - supports a few formats:
-      // - "Rank_Name (mobile)"  OR "Name (0923...)"  OR "Name - 0923..." OR "Name | 0923..."
       const personnelRaw = (r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
-      // split by semicolon, newline, or slash/pipe or comma (common)
       const rawPersonnel = personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/).map(p=>p.trim()).filter(Boolean);
 
       const PersonnelList = rawPersonnel.map(p=>{
-        // try to capture mobile in parentheses or trailing digits
         const inPar = p.match(/^(.*?)[\s\-]*\(?((\+?0?\d{9,13}))\)?\s*$/);
         if(inPar){ return { name: inPar[1].trim(), mobile: inPar[2].trim() }; }
-        // trailing - 0923...
         const dash = p.match(/^(.*?)[\s\-]+(\+?\d{9,13})$/);
         if(dash) return { name: dash[1].trim(), mobile: dash[2].trim() };
-        // if the entry itself is just a number
         if(/^\+?\d{9,13}$/.test(p)) return { name: "", mobile: p };
-        // default: no mobile
         return { name: p, mobile: "" };
       });
 
@@ -372,49 +404,44 @@ async function loadData(){
         Name: (r.Name || r["Name (Rank FName MI LName)"] || "").toString().trim(),
         CallSign: (r["Call Sign"] || r.CallSign || "").toString().trim(),
         Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim(),
-        
-Photo: (function() {
-  // Case-insensitive lookup for photo fields
-  const keys = ["Photo","photo","PHOTO","Photo URL","Image","Photo Link","Image URL"];
-  let url = "";
-  for (const k of keys) {
-    if (r[k]) { url = r[k]; break; }
-  }
+        Photo: (function() {
+          const keys = ["Photo", "photo", "PHOTO", "Photo URL", "Image", "Photo Link", "Image URL"];
+          let url = "";
+          for (const k of keys) {
+            if (r[k]) { url = r[k]; break; }
+          }
+          url = url.toString().trim();
+          console.log("[PHOTO RAW]", url);
 
-  url = url.toString().trim();
-  console.log("[PHOTO RAW]", url);
+          if (url.includes("drive.google.com/file/d/")) {
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+              url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+              console.log("[PHOTO FIXED FILE]", url);
+            }
+          } else if (url.includes("drive.google.com/open?id=")) {
+            const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+              url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+              console.log("[PHOTO FIXED OPEN]", url);
+            }
+          } else if (url.includes("drive.google.com")) {
+            const match = url.match(/([a-zA-Z0-9_-]{25,44})/);
+            if (match && match[1]) {
+              url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
+              console.log("[PHOTO FIXED GENERIC]", url);
+            }
+          }
 
-
-
-  // Debug log – optional, can remove later
-  console.log("[PHOTO RAW]", url);
-
-  // Case 1: Google Drive "file/d/FILEID/view" format
-  if (url.includes("drive.google.com/file/d/")) {
-    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      url = `https://drive.google.com/uc?export=view&id=${match[1]}`;
-      console.log("[PHOTO FIXED]", url);
-    }
-  }
-  // Case 2: Google Drive "open?id=FILEID" format
-  else if (url.includes("drive.google.com/open?id=")) {
-    const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      url = `https://drive.google.com/uc?export=view&id=${match[1]}`;
-      console.log("[PHOTO FIXED]", url);
-    }
-  }
-
-  return url;
-})(),
-		
+          console.log("[PHOTO FINAL]", url || PLACEHOLDER_IMG);
+          return url || PLACEHOLDER_IMG;
+        })(),
         Location: (r.Location || r.PatrolArea || "").toString().trim(),
         PersonnelList,
         Lat: lat, Lng: lng,
         _rowIndex: idx
       };
-    }).filter(r => r.Station); // keep rows that have Station
+    }).filter(r => r.Station);
 
     crimeData = (crimeRows || []).map(r => ({
       raw: r,
@@ -436,33 +463,25 @@ Photo: (function() {
 
 /* ===========================
    REFRESH UI
-   - Rebuild station dropdown
-   - Clear markers and reapply filters
    ===========================
 */
 function refreshUI(){
-  // populate station dropdown
   const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
 
-  // reset shift/type controls
   shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
   typeSelect.innerHTML  = "<option value='All'>All</option>"; typeSelect.disabled = true;
 
-  // reset selection state
   selectedStation = "All"; selectedShift = "All"; selectedType = "All";
 
-  // clear previous markers
   displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){} });
   displayedMarkers = [];
 
-  applyFilters(); // this builds markers & tables
+  applyFilters();
 }
 
 /* ===========================
    APPLY FILTERS
-   - Filter allData by selected filters
-   - Recreate markers and tables
    ===========================
 */
 let selectedStation = "All", selectedShift = "All", selectedType = "All";
@@ -470,35 +489,33 @@ function applyFilters(){
   showLoading(true);
   console.log("[FILTER] Applying filters:", { selectedStation, selectedShift, selectedType });
 
-  // filter data
   const filtered = allData.filter(d =>
     (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
     (selectedShift === "All"   || normalize(d.Shift) === normalize(selectedShift)) &&
     (selectedType === "All"    || normalize(d["Deployment Type"]) === normalize(selectedType))
   );
 
-  // clear markers
   displayedMarkers.forEach(mset => {
     try{ map.removeLayer(mset.marker); } catch(e){}
   });
   displayedMarkers = [];
 
-  // Add markers (one per deployment); attach person array to marker
   const bounds = [];
   filtered.forEach(r => {
     if(r.Lat != null && r.Lng != null){
       const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
-      // build popup with per-person links and photo placeholder
+      console.log("[POPUP IMG VALUE]", r.Photo, r);
 
-	  console.log("[POPUP IMG VALUE]", r.Photo, r);
+      // Use CORS proxy for Google Drive URLs
+      const imgSrc = r.Photo.includes('drive.google.com') ? 
+        `${CORS_PROXY}${r.Photo.replace(/&amp;/g, '&')}` : 
+        r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG;
+      console.log("[POPUP IMG SRC]", imgSrc);
 
-	  
       let popupHtml = `
-	  
   <div class="popup-card">
     <div class="popup-header">
       <h3>${escapeHtml(r.Station || "Unknown Unit")}</h3>
-      
     </div>
     ${r.Location ? `<div class="popup-row"><b>Patrol Area:</b> ${escapeHtml(r.Location)}</div>` : ""}
     ${r.Shift ? `<div class="popup-row"><b>Shift:</b> ${escapeHtml(r.Shift)}</div>` : ""}
@@ -522,22 +539,33 @@ function applyFilters(){
           : `<div class="popup-person"><strong>${escapeHtml(r.Name || "Unnamed")}</strong></div>`
       }
     </div>
-    <div class="popup-photo">
-    <img src="${r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG}" 
-     alt="photo"
-     onerror="this.src='${PLACEHOLDER_IMG}';">
+    <div class="popup-photo loading">
+      <img src="${imgSrc}" 
+           alt="photo"
+           onload="console.log('[IMG LOADED]', this.src); this.parentNode.classList.remove('loading');"
+           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
     </div>
   </div>
 `;
 
+      const icon = ICONS[r["Deployment Type"]] || ICONS["default"];
+      const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
+        maxWidth: 400,
+        minWidth: 250,
+        className: "custom-popup"
+      });
 
-      // create marker and attach meta
-const icon = ICONS[r["Deployment Type"]] || ICONS["default"];
-const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
-  maxWidth: 400,
-  minWidth: 250,
-  className: "custom-popup"
-});
+      // Force image reload when popup opens
+      marker.on('popupopen', function() {
+        console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc);
+        const img = document.querySelector('.leaflet-popup-content .popup-photo img');
+        if (img) {
+          const originalSrc = img.src;
+          img.src = ''; // Reset src to force reload
+          img.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
+          console.log("[POPUP OPEN] Forced image reload:", img.src);
+        }
+      });
 
       marker.addTo(map);
       displayedMarkers.push({ marker, deployment: r });
@@ -547,7 +575,6 @@ const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
     }
   });
 
-  // Fit map to markers if any
   if(bounds.length){
     try{
       const b = L.latLngBounds(bounds);
@@ -557,31 +584,20 @@ const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
     map.setView(defaultCenter, defaultZoom);
   }
 
-  // render personnel table - one row per person
   renderPersonnelTable(filtered);
-
-  // render crimes (muted rows unclickable)
   renderCrimeTable();
-
-  // update summary
   updateSummaryBox(filtered);
 
   showLoading(false);
 }
 
 /* ===========================
-   RENDER PERSONNEL (ONE ROW PER PERSON)
-   - Each row: Name | Mobile (visible & viber link) | CallSign | Station
-   - Clicking a person row:
-       -> Highlights table row (gold)
-       -> Adds golden marker on the map (circle marker)
-       -> Centers/flys to deployment marker & opens popup
+   RENDER PERSONNEL
    ===========================
 */
 function renderPersonnelTable(filteredDeployments){
   personnelTbody.innerHTML = "";
 
-  // Flatten deployments -> person rows
   const personRows = [];
   filteredDeployments.forEach(dep => {
     if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
@@ -596,7 +612,6 @@ function renderPersonnelTable(filteredDeployments){
         });
       });
     } else {
-      // fallback: one entry if no PersonnelList
       personRows.push({
         name: dep.Name || "",
         mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "",
@@ -614,32 +629,24 @@ function renderPersonnelTable(filteredDeployments){
     return;
   }
 
-  const visible = personnelExpanded ? personRows : personRows.slice(0, 20); // show up to 20 rows when collapsed
+  const visible = personnelExpanded ? personRows : personRows.slice(0, 20);
   visible.forEach((p, idx) => {
     const tr = document.createElement("tr");
     tr.className = "person-row";
     const mobileCell = p.mobile ? `<td>${makeContactLinks(p.mobile)}</td>` : `<td><span style="opacity:0.6">no mobile</span></td>`;
     tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
     tr.onclick = (ev) => {
-      // unselect previous
       if(selectedRowEl) selectedRowEl.classList.remove("selected");
       tr.classList.add("selected");
       selectedRowEl = tr;
 
-      // find the marker for this deployment
       const match = displayedMarkers.find(m => m.deployment === p.deployment);
       if(match){
-        // center/fly and open popup
         try{ map.flyTo(match.marker.getLatLng(), 15, {animate:true, duration: 0.9}); } catch(e){}
         match.marker.openPopup();
-
-        // add golden highlight circle
         addHighlight([match.deployment.Lat, match.deployment.Lng]);
-
-        // console debug
         console.log("[PERSON CLICK] Selected person:", p.name, "deployment:", match.deployment.Station);
       } else if(p.lat && p.lng){
-        // no marker but coords present — add transient highlight & fly
         try{ map.flyTo([p.lat, p.lng], 15, {animate:true, duration:0.9}); } catch(e){}
         addHighlight([p.lat, p.lng]);
         console.log("[PERSON CLICK] No marker, but lat/lng used:", p);
@@ -656,9 +663,6 @@ function renderPersonnelTable(filteredDeployments){
 
 /* ===========================
    RENDER CRIME TABLE
-   - Rows with zero count are muted (greyed out) and unclickable
-   - For "All" station: aggregate counts across available stations
-   - For single station: show barangay breakdown
    ===========================
 */
 function renderCrimeTable(){
@@ -670,7 +674,6 @@ function renderCrimeTable(){
 
   const station = stationSelect.value;
   if(station === "All"){
-    // count for focus crimes across stations present in deployments
     const validStations = new Set(allData.map(d => d.Station));
     const counts = {};
     crimeData.forEach(c => {
@@ -686,7 +689,6 @@ function renderCrimeTable(){
       crimeTbody.appendChild(tr);
     });
   } else {
-    // station-specific aggregate
     const normalized = normalize(station);
     const exists = allData.some(d => normalize(d.Station) === normalized);
     if(!exists){
@@ -722,8 +724,6 @@ function renderCrimeTable(){
 
 /* ===========================
    SUMMARY BOX
-   - If All: display total personnel
-   - If station selected: show total personnel + breakdown table (Shift | Type | Count)
    ===========================
 */
 function updateSummaryBox(filteredRows){
@@ -751,9 +751,7 @@ function updateSummaryBox(filteredRows){
 }
 
 /* ===========================
-   FILTER EVENT HANDLERS (Chaining)
-   - Station -> populates Shift & Type
-   - Shift & Type trigger filtering
+   FILTER EVENT HANDLERS
    ===========================
 */
 stationSelect.onchange = function(){
@@ -779,10 +777,8 @@ stationSelect.onchange = function(){
 shiftSelect.onchange = function(){ selectedShift = shiftSelect.value; applyFilters(); };
 typeSelect.onchange  = function(){ selectedType = typeSelect.value; applyFilters(); };
 
-/* personnel expand toggle */
 toggleLink.onclick = function(){ personnelExpanded = !personnelExpanded; applyFilters(); };
 
-/* refresh button resets filters and reloads data */
 refreshBtn.onclick = function(){
   selectedStation="All"; selectedShift="All"; selectedType="All";
   stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
@@ -791,19 +787,13 @@ refreshBtn.onclick = function(){
 };
 
 /* ===========================
-   AUTO-REFRESH (every 60s)
-   - reloads CSVs (cache-busted)
-   ===========================
-*/
-
-/* ===========================
    INITIAL LOAD
    ===========================
 */
 loadData();
 
 /* ===========================
-   DEBUG: expose some helpers on window for dev console
+   DEBUG: expose some helpers
    ===========================
 */
 window.__nids_debug = {
