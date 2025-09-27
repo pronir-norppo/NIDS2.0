@@ -135,7 +135,7 @@
 
 .popup-photo img {
   max-width: 100%;
-  max-height: 200px;
+  max-height: 160px;
   display: block;
   border-radius: 8px;
   border: 1px solid #333;
@@ -204,8 +204,8 @@ const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfV
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
 const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-const FALLBACK_TEST_IMAGE = "https://i.imgur.com/7mu4J9W.jpg"; // Reliable Imgur image
-const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
+const FALLBACK_TEST_IMAGE = "https://i.imgur.com/O5XhX8W.jpg"; // New verified Imgur image
+const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -382,7 +382,7 @@ async function loadData(){
       img.src = url;
       img.onload = () => {
         console.log("[PRELOAD] Loaded:", url, "Time:", new Date().toISOString());
-        imageCache.set(url, url); // Cache the URL
+        imageCache.set(url, url);
       };
       img.onerror = () => console.log("[PRELOAD] Failed:", url, "Time:", new Date().toISOString());
     });
@@ -420,7 +420,7 @@ async function loadData(){
           console.log("[PHOTO RAW]", url);
 
           if (url.includes("drive.google.com/file/d/")) {
-            const match = url.match(/\/d\/([a-zAZ0-9_-]+)/);
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             if (match && match[1]) {
               url = `https://drive.google.com/uc?export=view&id=${match[1]}&format=jpg`;
               console.log("[PHOTO FIXED FILE]", url);
@@ -551,13 +551,18 @@ function applyFilters(){
       <img src="${imageCache.get(imgSrc) || imgSrc}" 
            alt="photo"
            onload="console.log('[IMG LOADED]', this.src, 'Time:', new Date().toISOString()); this.parentNode.classList.remove('loading');"
-           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); setTimeout(() => { this.src = '${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading'); }, 10000);">
+           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); setTimeout(() => { this.src = '${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading'); }, 15000);">
     </div>
   </div>
 `;
 
       const icon = ICONS[r["Deployment Type"] || "default"];
-      const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
+      const marker = L.marker([r.Lat, r.Lng], { icon });
+
+      // Bind popup as static DOM element
+      const popupDiv = document.createElement('div');
+      popupDiv.innerHTML = popupHtml;
+      marker.bindPopup(popupDiv, {
         maxWidth: 400,
         minWidth: 250,
         className: "custom-popup",
@@ -567,7 +572,7 @@ function applyFilters(){
 
       marker.on('popupopen', function() {
         console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc, "Time:", new Date().toISOString());
-        const img = document.querySelector('.leaflet-popup-content .popup-photo img');
+        const img = popupDiv.querySelector('.popup-photo img');
         if (img && !img.complete && !imageCache.get(imgSrc)) {
           console.log("[POPUP OPEN] Image not loaded, setting timeout for", imgSrc);
           setTimeout(() => {
@@ -576,7 +581,7 @@ function applyFilters(){
               img.src = PLACEHOLDER_IMG;
               img.parentNode.classList.remove('loading');
             }
-          }, 10000);
+          }, 15000);
         }
       });
 
