@@ -184,7 +184,7 @@
       <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
     </div>
 
-    <!-- MAIN: Map + Summary -->
+    <!-- MAIN: Map muod Summary -->
     <div class="main">
       <div id="map">
         <div id="summaryBox">Summary...</div>
@@ -203,7 +203,7 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
-const FALLBACK_TEST_IMAGE = "https://i.imgur.com/O5XhX8W.jpg"; // Verified Imgur image
+const FALLBACK_TEST_IMAGE = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=160&h=90"; // Reliable Unsplash image
 const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
@@ -324,10 +324,17 @@ function makeContactLinks(mobile){
 function fetchCsv(url){
   return fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {cache: "no-store"})
     .then(r => {
-      if(!r.ok) throw new Error("Network response not ok");
+      if(!r.ok) throw new Error("Network response not ok: " + r.status);
       return r.text();
     })
-    .then(text => Papa.parse(text, { header: true, skipEmptyLines: true }).data);
+    .then(text => {
+      console.log("[FETCH CSV] Successfully fetched:", url);
+      return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+    })
+    .catch(err => {
+      console.error("[FETCH CSV] Error fetching:", url, err);
+      throw err;
+    });
 }
 
 /* ===========================
@@ -383,7 +390,10 @@ async function loadData(){
         console.log("[PRELOAD] Loaded:", url, "Time:", new Date().toISOString());
         imageCache.set(url, url);
       };
-      img.onerror = () => console.log("[PRELOAD] Failed:", url, "Time:", new Date().toISOString());
+      img.onerror = () => {
+        console.log("[PRELOAD] Failed:", url, "Time:", new Date().toISOString());
+        imageCache.set(url, PLACEHOLDER_IMG);
+      };
     });
 
     allData = depRows.map((r, idx) => {
@@ -471,18 +481,24 @@ async function loadData(){
    ===========================
 */
 function refreshUI(){
-  const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  try {
+    console.log("[REFRESH UI] Starting...");
+    const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
 
-  shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
-  typeSelect.innerHTML  = "<option value='All'>All</option>"; typeSelect.disabled = true;
+    shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
+    typeSelect.innerHTML  = "<option value='All'>All</option>"; typeSelect.disabled = true;
 
-  selectedStation = "All"; selectedShift = "All"; selectedType = "All";
+    selectedStation = "All"; selectedShift = "All"; selectedType = "All";
 
-  displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){} });
-  displayedMarkers = [];
+    displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){} });
+    displayedMarkers = [];
 
-  applyFilters();
+    applyFilters();
+    console.log("[REFRESH UI] Completed");
+  } catch(err) {
+    console.error("[REFRESH UI] Error:", err);
+  }
 }
 
 /* ===========================
@@ -491,171 +507,179 @@ function refreshUI(){
 */
 let selectedStation = "All", selectedShift = "All", selectedType = "All";
 function applyFilters(){
-  showLoading(true);
-  console.log("[FILTER] Applying filters:", { selectedStation, selectedShift, selectedType });
+  try {
+    showLoading(true);
+    console.log("[FILTER] Applying filters:", { selectedStation, selectedShift, selectedType });
 
-  const filtered = allData.filter(d =>
-    (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
-    (selectedShift === "All"   || normalize(d.Shift) === normalize(selectedShift)) &&
-    (selectedType === "All"    || normalize(d["Deployment Type"]) === normalize(selectedType))
-  );
+    const filtered = allData.filter(d =>
+      (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
+      (selectedShift === "All"   || normalize(d.Shift) === normalize(selectedShift)) &&
+      (selectedType === "All"    || normalize(d["Deployment Type"]) === normalize(selectedType))
+    );
 
-  displayedMarkers.forEach(mset => {
-    try{ map.removeLayer(mset.marker); } catch(e){}
-  });
-  displayedMarkers = [];
+    displayedMarkers.forEach(mset => {
+      try{ map.removeLayer(mset.marker); } catch(e){}
+    });
+    displayedMarkers = [];
 
-  const bounds = [];
-  filtered.forEach((r, idx) => {
-    if(r.Lat != null && r.Lng != null){
-      const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
-      console.log("[POPUP IMG VALUE]", r.Photo, r);
+    const bounds = [];
+    filtered.forEach((r, idx) => {
+      if(r.Lat != null && r.Lng != null){
+        const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
+        console.log("[POPUP IMG VALUE]", r.Photo, r);
 
-      // Use Imgur for all markers for testing
-      const imgSrc = FALLBACK_TEST_IMAGE; // Temporarily use Imgur for all
-      console.log("[POPUP IMG SRC]", imgSrc);
+        // Use Unsplash for all markers for testing
+        const imgSrc = imageCache.get(photoUrl) || FALLBACK_TEST_IMAGE;
+        console.log("[POPUP IMG SRC]", imgSrc);
 
-      // Create popup content as DOM elements
-      const popupDiv = document.createElement('div');
-      popupDiv.className = 'popup-card';
-      
-      const header = document.createElement('div');
-      header.className = 'popup-header';
-      const h3 = document.createElement('h3');
-      h3.textContent = r.Station || 'Unknown Unit';
-      header.appendChild(h3);
-      popupDiv.appendChild(header);
+        // Create popup content as DOM elements
+        const popupDiv = document.createElement('div');
+        popupDiv.className = 'popup-card';
+        
+        const header = document.createElement('div');
+        header.className = 'popup-header';
+        const h3 = document.createElement('h3');
+        h3.textContent = r.Station || 'Unknown Unit';
+        header.appendChild(h3);
+        popupDiv.appendChild(header);
 
-      if (r.Location) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Patrol Area:</b> ${escapeHtml(r.Location)}`;
-        popupDiv.appendChild(row);
-      }
-      if (r.Shift) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Shift:</b> ${escapeHtml(r.Shift)}`;
-        popupDiv.appendChild(row);
-      }
-      if (r["Deployment Type"]) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}`;
-        popupDiv.appendChild(row);
-      }
-      if (r.CallSign) {
-        const callsign = document.createElement('span');
-        callsign.className = 'popup-callsign';
-        callsign.innerHTML = `<b>Callsign</b>: ${escapeHtml(r.CallSign)}`;
-        popupDiv.appendChild(callsign);
-      }
+        if (r.Location) {
+          const row = document.createElement('div');
+          row.className = 'popup-row';
+          row.innerHTML = `<b>Patrol Area:</b> ${escapeHtml(r.Location)}`;
+          popupDiv.appendChild(row);
+        }
+        if (r.Shift) {
+          const row = document.createElement('div');
+          row.className = 'popup-row';
+          row.innerHTML = `<b>Shift:</b> ${escapeHtml(r.Shift)}`;
+          popupDiv.appendChild(row);
+        }
+        if (r["Deployment Type"]) {
+          const row = document.createElement('div');
+          row.className = 'popup-row';
+          row.innerHTML = `<b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}`;
+          popupDiv.appendChild(row);
+        }
+        if (r.CallSign) {
+          const callsign = document.createElement('span');
+          callsign.className = 'popup-callsign';
+          callsign.innerHTML = `<b>Callsign</b>: ${escapeHtml(r.CallSign)}`;
+          popupDiv.appendChild(callsign);
+        }
 
-      const hr = document.createElement('hr');
-      popupDiv.appendChild(hr);
+        const hr = document.createElement('hr');
+        popupDiv.appendChild(hr);
 
-      const peopleDiv = document.createElement('div');
-      peopleDiv.className = 'popup-people';
-      if (Array.isArray(r.PersonnelList) && r.PersonnelList.length) {
-        r.PersonnelList.forEach((p, idx) => {
+        const peopleDiv = document.createElement('div');
+        peopleDiv.className = 'popup-people';
+        if (Array.isArray(r.PersonnelList) && r.PersonnelList.length) {
+          r.PersonnelList.forEach((p, idx) => {
+            const personDiv = document.createElement('div');
+            personDiv.className = 'popup-person';
+            const name = p.name || r.Name || ("Person " + (idx+1));
+            const mobile = p.mobile || "";
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'person-name';
+            nameSpan.textContent = name;
+            personDiv.appendChild(nameSpan);
+            personDiv.appendChild(document.createElement('br'));
+            personDiv.innerHTML += mobile ? makeContactLinks(mobile) : `<span style="opacity:0.6">no mobile</span>`;
+            peopleDiv.appendChild(personDiv);
+          });
+        } else {
           const personDiv = document.createElement('div');
           personDiv.className = 'popup-person';
-          const name = p.name || r.Name || ("Person " + (idx+1));
-          const mobile = p.mobile || "";
-          const nameSpan = document.createElement('span');
-          nameSpan.className = 'person-name';
-          nameSpan.textContent = name;
-          personDiv.appendChild(nameSpan);
-          personDiv.appendChild(document.createElement('br'));
-          personDiv.innerHTML += mobile ? makeContactLinks(mobile) : `<span style="opacity:0.6">no mobile</span>`;
+          personDiv.innerHTML = `<strong>${escapeHtml(r.Name || "Unnamed")}</strong>`;
           peopleDiv.appendChild(personDiv);
-        });
-      } else {
-        const personDiv = document.createElement('div');
-        personDiv.className = 'popup-person';
-        personDiv.innerHTML = `<strong>${escapeHtml(r.Name || "Unnamed")}</strong>`;
-        peopleDiv.appendChild(personDiv);
-      }
-      popupDiv.appendChild(peopleDiv);
-
-      const photoDiv = document.createElement('div');
-      photoDiv.className = 'popup-photo loading';
-      const img = document.createElement('img');
-      img.src = imageCache.get(imgSrc) || imgSrc;
-      img.alt = 'photo';
-      img.onload = () => {
-        console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Time:', new Date().toISOString());
-        photoDiv.classList.remove('loading');
-      };
-      img.onerror = () => {
-        console.log('[IMG ERROR]', img.src, 'Time:', new Date().toISOString());
-        img.src = PLACEHOLDER_IMG;
-        photoDiv.classList.remove('loading');
-      };
-      photoDiv.appendChild(img);
-      popupDiv.appendChild(photoDiv);
-
-      const icon = ICONS[r["Deployment Type"] || "default"];
-      const marker = L.marker([r.Lat, r.Lng], { icon });
-
-      // Bind popup as static DOM element
-      marker.bindPopup(popupDiv, {
-        maxWidth: 400,
-        minWidth: 250,
-        className: "custom-popup",
-        autoClose: false,
-        keepInView: true
-      });
-
-      // MutationObserver to detect popup content changes
-      marker.on('popupopen', function() {
-        console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc, "Time:", new Date().toISOString());
-        const popupContainer = document.querySelector('.leaflet-popup-content-wrapper');
-        if (popupContainer) {
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach(m => {
-              console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Attribute:", m.attributeName || 'N/A', "Time:", new Date().toISOString());
-              if (m.type === 'attributes' && m.target.nodeName === 'IMG' && m.attributeName === 'src') {
-                console.log("[POPUP MUTATION] Image src changed to:", m.target.src);
-              }
-            });
-          });
-          observer.observe(popupContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
-          console.log("[POPUP OBSERVER] Started for", r.Station, "Image Complete:", img.complete);
         }
-      });
+        popupDiv.appendChild(peopleDiv);
 
-      marker.on('popupclose', function() {
-        console.log("[POPUP CLOSE] Marker:", r.Station, "Time:", new Date().toISOString());
-      });
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'popup-photo loading';
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = 'photo';
+        img.onload = () => {
+          console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Time:', new Date().toISOString());
+          photoDiv.classList.remove('loading');
+        };
+        img.onerror = () => {
+          console.log('[IMG ERROR]', img.src, 'Time:', new Date().toISOString());
+          img.src = STATIC_TEST_IMAGE; // Fallback to base64 image
+          photoDiv.classList.remove('loading');
+        };
+        photoDiv.appendChild(img);
+        popupDiv.appendChild(photoDiv);
 
-      // Log map events
-      map.on('popupopen popupclose moveend zoomend', (e) => {
-        console.log("[MAP EVENT] Type:", e.type, "Time:", new Date().toISOString());
-      });
+        const icon = ICONS[r["Deployment Type"] || "default"];
+        const marker = L.marker([r.Lat, r.Lng], { icon });
 
-      marker.addTo(map);
-      displayedMarkers.push({ marker, deployment: r });
-      bounds.push([r.Lat, r.Lng]);
+        // Bind popup as static DOM element
+        marker.bindPopup(popupDiv, {
+          maxWidth: 400,
+          minWidth: 250,
+          className: "custom-popup",
+          autoClose: false,
+          keepInView: true
+        });
+
+        // MutationObserver to detect popup content changes
+        marker.on('popupopen', function() {
+          console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", img.src, "Time:", new Date().toISOString());
+          const popupContainer = document.querySelector('.leaflet-popup-content-wrapper');
+          if (popupContainer) {
+            const observer = new MutationObserver((mutations) => {
+              mutations.forEach(m => {
+                console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Attribute:", m.attributeName || 'N/A', "Time:", new Date().toISOString());
+                if (m.type === 'attributes' && m.target.nodeName === 'IMG' && m.attributeName === 'src') {
+                  console.log("[POPUP MUTATION] Image src changed to:", m.target.src);
+                }
+              });
+            });
+            observer.observe(popupContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+            console.log("[POPUP OBSERVER] Started for", r.Station, "Image Complete:", img.complete);
+          }
+        });
+
+        marker.on('popupclose', function() {
+          console.log("[POPUP CLOSE] Marker:", r.Station, "Time:", new Date().toISOString());
+        });
+
+        // Log map events
+        map.on('popupopen popupclose moveend zoomend', (e) => {
+          console.log("[MAP EVENT] Type:", e.type, "Time:", new Date().toISOString());
+        });
+
+        marker.addTo(map);
+        displayedMarkers.push({ marker, deployment: r });
+        bounds.push([r.Lat, r.Lng]);
+      } else {
+        console.warn("[MARKER] Missing lat/lng for deployment:", r.Station, r.CallSign, r._rowIndex);
+      }
+    });
+
+    if(bounds.length){
+      try{
+        const b = L.latLngBounds(bounds);
+        map.fitBounds(b.pad(0.2));
+        console.log("[MAP] Fit bounds:", bounds);
+      } catch(e){ console.error("[MAP] fitBounds error:", e); }
     } else {
-      console.warn("[MARKER] Missing lat/lng for deployment:", r.Station, r.CallSign, r._rowIndex);
+      map.setView(defaultCenter, defaultZoom);
+      console.log("[MAP] No bounds, set default view");
     }
-  });
 
-  if(bounds.length){
-    try{
-      const b = L.latLngBounds(bounds);
-      map.fitBounds(b.pad(0.2));
-    } catch(e){ console.warn("fitBounds error", e); }
-  } else {
-    map.setView(defaultCenter, defaultZoom);
+    renderPersonnelTable(filtered);
+    renderCrimeTable();
+    updateSummaryBox(filtered);
+
+    console.log("[FILTER] Completed, markers:", displayedMarkers.length);
+    showLoading(false);
+  } catch(err) {
+    console.error("[FILTER] Error applying filters:", err);
+    showLoading(false);
   }
-
-  renderPersonnelTable(filtered);
-  renderCrimeTable();
-  updateSummaryBox(filtered);
-
-  showLoading(false);
 }
 
 /* ===========================
@@ -663,69 +687,76 @@ function applyFilters(){
    ===========================
 */
 function renderPersonnelTable(filteredDeployments){
-  personnelTbody.innerHTML = "";
+  try {
+    console.log("[RENDER PERSONNEL] Starting...");
+    personnelTbody.innerHTML = "";
 
-  const personRows = [];
-  filteredDeployments.forEach(dep => {
-    if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
-      dep.PersonnelList.forEach(p => {
+    const personRows = [];
+    filteredDeployments.forEach(dep => {
+      if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
+        dep.PersonnelList.forEach(p => {
+          personRows.push({
+            name: p.name || dep.Name || "",
+            mobile: p.mobile || "",
+            CallSign: dep.CallSign || "",
+            Station: dep.Station || "",
+            lat: dep.Lat, lng: dep.Lng,
+            deployment: dep
+          });
+        });
+      } else {
         personRows.push({
-          name: p.name || dep.Name || "",
-          mobile: p.mobile || "",
+          name: dep.Name || "",
+          mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "",
           CallSign: dep.CallSign || "",
           Station: dep.Station || "",
           lat: dep.Lat, lng: dep.Lng,
           deployment: dep
         });
-      });
-    } else {
-      personRows.push({
-        name: dep.Name || "",
-        mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "",
-        CallSign: dep.CallSign || "",
-        Station: dep.Station || "",
-        lat: dep.Lat, lng: dep.Lng,
-        deployment: dep
-      });
-    }
-  });
-
-  if(personRows.length === 0){
-    personnelTbody.innerHTML = "<tr><td colspan='4'>No personnel</td></tr>";
-    toggleLink.style.display = "none";
-    return;
-  }
-
-  const visible = personnelExpanded ? personRows : personRows.slice(0, 20);
-  visible.forEach((p, idx) => {
-    const tr = document.createElement("tr");
-    tr.className = "person-row";
-    const mobileCell = p.mobile ? `<td>${makeContactLinks(p.mobile)}</td>` : `<td><span style="opacity:0.6">no mobile</span></td>`;
-    tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
-    tr.onclick = (ev) => {
-      if(selectedRowEl) selectedRowEl.classList.remove("selected");
-      tr.className = "person-row selected";
-      selectedRowEl = tr;
-
-      const match = displayedMarkers.find(m => m.deployment === p.deployment);
-      if(match){
-        try{ map.flyTo(match.marker.getLatLng(), 15, {animate:true, duration: 0.9}); } catch(e){}
-        match.marker.openPopup();
-        addHighlight([match.deployment.Lat, match.deployment.Lng]);
-        console.log("[PERSON CLICK] Selected person:", p.name, "deployment:", match.deployment.Station);
-      } else if(p.lat && p.lng){
-        try{ map.flyTo([p.lat, p.lng], 15, {animate:true, duration:0.9}); } catch(e){}
-        addHighlight([p.lat, p.lng]);
-        console.log("[PERSON CLICK] No marker, but lat/lng used:", p);
-      } else {
-        console.warn("[PERSON CLICK] No location available for person:", p);
       }
-    };
-    personnelTbody.appendChild(tr);
-  });
+    });
 
-  toggleLink.style.display = personRows.length > 20 ? "inline-block" : "none";
-  toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${personRows.length})`;
+    if(personRows.length === 0){
+      personnelTbody.innerHTML = "<tr><td colspan='4'>No personnel</td></tr>";
+      toggleLink.style.display = "none";
+      console.log("[RENDER PERSONNEL] No personnel to render");
+      return;
+    }
+
+    const visible = personnelExpanded ? personRows : personRows.slice(0, 20);
+    visible.forEach((p, idx) => {
+      const tr = document.createElement("tr");
+      tr.className = "person-row";
+      const mobileCell = p.mobile ? `<td>${makeContactLinks(p.mobile)}</td>` : `<td><span style="opacity:0.6">no mobile</span></td>`;
+      tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
+      tr.onclick = (ev) => {
+        if(selectedRowEl) selectedRowEl.classList.remove("selected");
+        tr.className = "person-row selected";
+        selectedRowEl = tr;
+
+        const match = displayedMarkers.find(m => m.deployment === p.deployment);
+        if(match){
+          try{ map.flyTo(match.marker.getLatLng(), 15, {animate:true, duration: 0.9}); } catch(e){}
+          match.marker.openPopup();
+          addHighlight([match.deployment.Lat, match.deployment.Lng]);
+          console.log("[PERSON CLICK] Selected person:", p.name, "deployment:", match.deployment.Station);
+        } else if(p.lat && p.lng){
+          try{ map.flyTo([p.lat, p.lng], 15, {animate:true, duration:0.9}); } catch(e){}
+          addHighlight([p.lat, p.lng]);
+          console.log("[PERSON CLICK] No marker, but lat/lng used:", p);
+        } else {
+          console.warn("[PERSON CLICK] No location available for person:", p);
+        }
+      };
+      personnelTbody.appendChild(tr);
+    });
+
+    toggleLink.style.display = personRows.length > 20 ? "inline-block" : "none";
+    toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${personRows.length})`;
+    console.log("[RENDER PERSONNEL] Completed, rows:", personRows.length);
+  } catch(err) {
+    console.error("[RENDER PERSONNEL] Error:", err);
+  }
 }
 
 /* ===========================
@@ -733,59 +764,67 @@ function renderPersonnelTable(filteredDeployments){
    ===========================
 */
 function renderCrimeTable(){
-  crimeTbody.innerHTML = "";
-  if(!crimeData || !crimeData.length){
-    crimeTbody.innerHTML = "<tr><td colspan=3>No crime data</td></tr>";
-    return;
-  }
-
-  const station = stationSelect.value;
-  if(station === "All"){
-    const validStations = new Set(allData.map(d => d.Station));
-    const counts = {};
-    crimeData.forEach(c => {
-      if(c["Focus Crimes"] && validStations.has(c.Station)){
-        counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1;
-      }
-    });
-    FOCUS_CRIMES.forEach(cr => {
-      const cnt = counts[cr] || 0;
-      const tr = document.createElement("tr");
-      tr.className = "crime-row" + (cnt===0 ? " muted" : "");
-      tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>(all barangays)</td><td><center>${cnt}</center></td>`;
-      crimeTbody.appendChild(tr);
-    });
-  } else {
-    const normalized = normalize(station);
-    const exists = allData.some(d => normalize(d.Station) === normalized);
-    if(!exists){
-      crimeTbody.innerHTML = "<tr><td colspan=3>No crimes (station not in deployment)</td></tr>";
+  try {
+    console.log("[RENDER CRIME] Starting...");
+    crimeTbody.innerHTML = "";
+    if(!crimeData || !crimeData.length){
+      crimeTbody.innerHTML = "<tr><td colspan=3>No crime data</td></tr>";
+      console.log("[RENDER CRIME] No crime data");
       return;
     }
-    const counts = {};
-    crimeData.forEach(c => {
-      if(normalize(c.Station) === normalized){
-        const key = (c["Focus Crimes"] || "(unknown)") + "|" + (c.Barangay || "(unknown)");
-        counts[key] = (counts[key] || 0) + 1;
-      }
-    });
-    FOCUS_CRIMES.forEach(cr=>{
-      const entries = Object.entries(counts).filter(([k]) => k.startsWith(cr + "|"));
-      if(entries.length){
-        entries.forEach(([key,cnt])=>{
-          const [, brgy] = key.split("|");
-          const tr = document.createElement("tr");
-          tr.className = "crime-row";
-          tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
-          crimeTbody.appendChild(tr);
-        });
-      } else {
+
+    const station = stationSelect.value;
+    if(station === "All"){
+      const validStations = new Set(allData.map(d => d.Station));
+      const counts = {};
+      crimeData.forEach(c => {
+        if(c["Focus Crimes"] && validStations.has(c.Station)){
+          counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1;
+        }
+      });
+      FOCUS_CRIMES.forEach(cr => {
+        const cnt = counts[cr] || 0;
         const tr = document.createElement("tr");
-        tr.className = "crime-row muted";
-        tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>-</td><td><center>0</center></td>`;
+        tr.className = "crime-row" + (cnt===0 ? " muted" : "");
+        tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>(all barangays)</td><td><center>${cnt}</center></td>`;
         crimeTbody.appendChild(tr);
+      });
+    } else {
+      const normalized = normalize(station);
+      const exists = allData.some(d => normalize(d.Station) === normalized);
+      if(!exists){
+        crimeTbody.innerHTML = "<tr><td colspan=3>No crimes (station not in deployment)</td></tr>";
+        console.log("[RENDER CRIME] No crimes for station:", station);
+        return;
       }
-    });
+      const counts = {};
+      crimeData.forEach(c => {
+        if(normalize(c.Station) === normalized){
+          const key = (c["Focus Crimes"] || "(unknown)") + "|" + (c.Barangay || "(unknown)");
+          counts[key] = (counts[key] || 0) + 1;
+        }
+      });
+      FOCUS_CRIMES.forEach(cr=>{
+        const entries = Object.entries(counts).filter(([k]) => k.startsWith(cr + "|"));
+        if(entries.length){
+          entries.forEach(([key,cnt])=>{
+            const [, brgy] = key.split("|");
+            const tr = document.createElement("tr");
+            tr.className = "crime-row";
+            tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
+            crimeTbody.appendChild(tr);
+          });
+        } else {
+          const tr = document.createElement("tr");
+          tr.className = "crime-row muted";
+          tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>-</td><td><center>0</center></td>`;
+          crimeTbody.appendChild(tr);
+        }
+      });
+    }
+    console.log("[RENDER CRIME] Completed");
+  } catch(err) {
+    console.error("[RENDER CRIME] Error:", err);
   }
 }
 
@@ -794,26 +833,33 @@ function renderCrimeTable(){
    ===========================
 */
 function updateSummaryBox(filteredRows){
-  if(!filteredRows) filteredRows = [];
-  if(filteredRows.length === 0){
-    summaryBox.innerHTML = "No personnel";
-    return;
-  }	
+  try {
+    console.log("[UPDATE SUMMARY] Starting...");
+    if(!filteredRows) filteredRows = [];
+    if(filteredRows.length === 0){
+      summaryBox.innerHTML = "No personnel";
+      console.log("[UPDATE SUMMARY] No personnel");
+      return;
+    }	
 
-  if(stationSelect.value === "All"){
-    const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
-    summaryBox.innerHTML = `<b>Total Personnel:</b> ${totalPersonnel}`;
-  } else {
-    const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
-    const groups = {};
-    filteredRows.forEach(r=>{
-      const key = (r.Shift||"") + "||" + (r["Deployment Type"]||"");
-      groups[key] = groups[key] || { shift: r.Shift||"", type: r["Deployment Type"]||"", count:0 };
-      groups[key].count += (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList?1:0));
-    });
-    let rowsHtml = Object.values(groups).map(g => `<tr><td>${escapeHtml(g.shift)}</td><td>${escapeHtml(g.type)}</td><td>${g.count}</td></tr>`).join("");
-    if(!rowsHtml) rowsHtml = `<tr><td colspan=3>No deployment details</td></tr>`;
-    summaryBox.innerHTML = `<b>${escapeHtml(stationSelect.value)}</b><br>Total Personnel: ${totalPersonnel}<br><table><tr><td>Shift</td><td>Type</td><td>Count</td></tr>${rowsHtml}</table>`;
+    if(stationSelect.value === "All"){
+      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
+      summaryBox.innerHTML = `<b>Total Personnel:</b> ${totalPersonnel}`;
+    } else {
+      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
+      const groups = {};
+      filteredRows.forEach(r=>{
+        const key = (r.Shift||"") + "||" + (r["Deployment Type"]||"");
+        groups[key] = groups[key] || { shift: r.Shift||"", type: r["Deployment Type"]||"", count:0 };
+        groups[key].count += (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList?1:0));
+      });
+      let rowsHtml = Object.values(groups).map(g => `<tr><td>${escapeHtml(g.shift)}</td><td>${escapeHtml(g.type)}</td><td>${g.count}</td></tr>`).join("");
+      if(!rowsHtml) rowsHtml = `<tr><td colspan=3>No deployment details</td></tr>`;
+      summaryBox.innerHTML = `<b>${escapeHtml(stationSelect.value)}</b><br>Total Personnel: ${totalPersonnel}<br><table><tr><td>Shift</td><td>Type</td><td>Count</td></tr>${rowsHtml}</table>`;
+    }
+    console.log("[UPDATE SUMMARY] Completed");
+  } catch(err) {
+    console.error("[UPDATE SUMMARY] Error:", err);
   }
 }
 
@@ -822,23 +868,27 @@ function updateSummaryBox(filteredRows){
    ===========================
 */
 stationSelect.onchange = function(){
-  selectedStation = stationSelect.value;
-  selectedShift = "All";
-  selectedType = "All";
+  try {
+    selectedStation = stationSelect.value;
+    selectedShift = "All";
+    selectedType = "All";
 
-  if(selectedStation === "All"){
-    shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
-    typeSelect.innerHTML = "<option value='All'>All</option>"; typeSelect.disabled = true;
-  } else {
-    const stationRows = allData.filter(d => normalize(d.Station) === normalize(selectedStation));
-    const shifts = [...new Set(stationRows.map(r => r.Shift || "Unspecified"))];
-    const types  = [...new Set(stationRows.map(r => r["Deployment Type"] || "Unspecified"))];
-    shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-    typeSelect.innerHTML  = "<option value='All'>All</option>" + types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
-    shiftSelect.disabled = false; typeSelect.disabled = false;
+    if(selectedStation === "All"){
+      shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
+      typeSelect.innerHTML = "<option value='All'>All</option>"; typeSelect.disabled = true;
+    } else {
+      const stationRows = allData.filter(d => normalize(d.Station) === normalize(selectedStation));
+      const shifts = [...new Set(stationRows.map(r => r.Shift || "Unspecified"))];
+      const types  = [...new Set(stationRows.map(r => r["Deployment Type"] || "Unspecified"))];
+      shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      typeSelect.innerHTML  = "<option value='All'>All</option>" + types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+      shiftSelect.disabled = false; typeSelect.disabled = false;
+    }
+
+    applyFilters();
+  } catch(err) {
+    console.error("[STATION FILTER] Error:", err);
   }
-
-  applyFilters();
 };
 
 shiftSelect.onchange = function(){ selectedShift = shiftSelect.value; applyFilters(); };
@@ -847,10 +897,14 @@ typeSelect.onchange  = function(){ selectedType = typeSelect.value; applyFilters
 toggleLink.onclick = function(){ personnelExpanded = !personnelExpanded; applyFilters(); };
 
 refreshBtn.onclick = function(){
-  selectedStation="All"; selectedShift="All"; selectedType="All";
-  stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
-  map.setView(defaultCenter, defaultZoom);
-  loadData();
+  try {
+    selectedStation="All"; selectedShift="All"; selectedType="All";
+    stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
+    map.setView(defaultCenter, defaultZoom);
+    loadData();
+  } catch(err) {
+    console.error("[REFRESH BTN] Error:", err);
+  }
 };
 
 /* ===========================
