@@ -203,7 +203,8 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
-const CORS_PROXY = "https://cors-anywhere.herokuapp.com/";
+const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/150";
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -501,15 +502,16 @@ function applyFilters(){
   displayedMarkers = [];
 
   const bounds = [];
-  filtered.forEach(r => {
+  filtered.forEach((r, idx) => {
     if(r.Lat != null && r.Lng != null){
       const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
       console.log("[POPUP IMG VALUE]", r.Photo, r);
 
-      // Use CORS proxy for Google Drive URLs
-      const imgSrc = r.Photo.includes('drive.google.com') ? 
-        `${CORS_PROXY}${r.Photo.replace(/&amp;/g, '&')}` : 
-        r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG;
+      // Use CORS proxy for Google Drive URLs, fallback to test image for first marker
+      const imgSrc = idx === 0 ? FALLBACK_TEST_IMAGE : 
+        (r.Photo.includes('drive.google.com') ? 
+          `${CORS_PROXY}${encodeURIComponent(r.Photo.replace(/&amp;/g, '&'))}` : 
+          r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG);
       console.log("[POPUP IMG SRC]", imgSrc);
 
       let popupHtml = `
@@ -543,7 +545,7 @@ function applyFilters(){
       <img src="${imgSrc}" 
            alt="photo"
            onload="console.log('[IMG LOADED]', this.src); this.parentNode.classList.remove('loading');"
-           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
+           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, event); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
     </div>
   </div>
 `;
@@ -555,15 +557,17 @@ function applyFilters(){
         className: "custom-popup"
       });
 
-      // Force image reload when popup opens
+      // Force image reload with slight delay when popup opens
       marker.on('popupopen', function() {
         console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc);
         const img = document.querySelector('.leaflet-popup-content .popup-photo img');
         if (img) {
-          const originalSrc = img.src;
-          img.src = ''; // Reset src to force reload
-          img.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
-          console.log("[POPUP OPEN] Forced image reload:", img.src);
+          setTimeout(() => {
+            const originalSrc = img.src;
+            img.src = ''; // Reset src to force reload
+            img.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
+            console.log("[POPUP OPEN] Forced image reload:", img.src);
+          }, 100); // Slight delay to ensure DOM is ready
         }
       });
 
