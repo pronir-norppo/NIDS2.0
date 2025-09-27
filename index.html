@@ -203,7 +203,7 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
-const FALLBACK_TEST_IMAGE = "https://images.unsplash.com/photo-1580130775562-0cd80adb43f8?ixlib=rb-4.0.3&auto=format&fit=crop&w=160&h=90"; // Police-related image
+const FALLBACK_TEST_IMAGE = "https://images.unsplash.com/photo-1534088568595-a2f3f26b870a?ixlib=rb-4.0.3&auto=format&fit=crop&w=160&h=90"; // New police-related image
 const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
@@ -251,8 +251,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'
 
 /* Gold highlight style uses a circle marker */
 function addHighlight(latlng){
-  if(highlightLayer) try{ map.removeLayer(highlightLayer); } catch(e){ console.warn("[HIGHLIGHT] Remove error:", e); }
-  highlightLayer = L.circleMarker(latlng, { radius:10, color: '#b8860b', weight:3, fillColor:'#ffcc00', fillOpacity:0.9, opacity:1 }).addTo(map);
+  try {
+    if(highlightLayer) map.removeLayer(highlightLayer);
+    highlightLayer = L.circleMarker(latlng, { radius:10, color: '#b8860b', weight:3, fillColor:'#ffcc00', fillOpacity:0.9, opacity:1 }).addTo(map);
+  } catch(e) {
+    console.warn("[HIGHLIGHT] Error:", e);
+  }
 }
 
 /* ===========================
@@ -436,10 +440,17 @@ async function loadData(){
     console.log("[LOAD] Parsed deployments sample:", allData.slice(0,6));
     console.log("[LOAD] Parsed crimes count:", crimeData.length);
     console.log("[LOAD] Parsed crimes sample:", crimeData.slice(0,6));
+    console.log("[LOAD] Validating data before refreshUI...");
+    if (!allData || !Array.isArray(allData)) {
+      throw new Error("allData is not an array: " + JSON.stringify(allData));
+    }
+    if (!crimeData || !Array.isArray(crimeData)) {
+      throw new Error("crimeData is not an array: " + JSON.stringify(crimeData));
+    }
     console.log("[LOAD] Calling refreshUI...");
     refreshUI();
   } catch(err){
-    console.error("[LOAD] Error loading CSVs or parsing data:", err);
+    console.error("[LOAD] Error loading CSVs or parsing data:", err, "Stack:", err.stack);
   } finally {
     showLoading(false);
     console.log("[LOAD] Completed");
@@ -453,6 +464,7 @@ async function loadData(){
 function refreshUI(){
   try {
     console.log("[REFRESH UI] Starting...");
+    console.log("[REFRESH UI] allData:", allData.length, allData.slice(0,3));
     const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     console.log("[REFRESH UI] Stations:", stationSet);
     stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
@@ -469,7 +481,7 @@ function refreshUI(){
     applyFilters();
     console.log("[REFRESH UI] Completed");
   } catch(err) {
-    console.error("[REFRESH UI] Error:", err);
+    console.error("[REFRESH UI] Error:", err, "Stack:", err.stack);
   }
 }
 
@@ -499,6 +511,7 @@ function applyFilters(){
     filtered.forEach((r, idx) => {
       const lat = r.Lat != null ? r.Lat : FALLBACK_COORDS.lat;
       const lng = r.Lng != null ? r.Lng : FALLBACK_COORDS.lng;
+      console.log("[FILTER] Processing marker for:", r.Station, "Lat:", lat, "Lng:", lng, "Deployment Type:", r["Deployment Type"]);
 
       const photoUrl = r.Photo || FALLBACK_TEST_IMAGE;
       console.log("[POPUP IMG VALUE]", photoUrl, "Station:", r.Station);
@@ -574,19 +587,25 @@ function applyFilters(){
       const img = document.createElement('img');
       img.src = imgSrc;
       img.alt = 'photo';
+      img.width = 160;
+      img.height = 90;
       img.onload = () => {
         console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Station:', r.Station, 'Time:', new Date().toISOString());
         photoDiv.classList.remove('loading');
       };
       img.onerror = (err) => {
-        console.log('[IMG ERROR]', img.src, 'Station:', r.Station, 'Error:', err, 'Time:', new Date().toISOString());
+        console.error('[IMG ERROR]', img.src, 'Station:', r.Station, 'Error:', err, 'Time:', new Date().toISOString());
         img.src = STATIC_TEST_IMAGE;
+        img.width = 160;
+        img.height = 90;
         photoDiv.classList.remove('loading');
       };
       photoDiv.appendChild(img);
       popupDiv.appendChild(photoDiv);
 
-      const icon = ICONS[r["Deployment Type"] || "default"];
+      const deploymentType = r["Deployment Type"] || "default";
+      const icon = ICONS[deploymentType] || ICONS["default"];
+      console.log("[MARKER] Creating marker for:", r.Station, "Icon:", deploymentType);
       const marker = L.marker([lat, lng], { icon });
 
       // Bind popup as static DOM element
@@ -630,6 +649,7 @@ function applyFilters(){
       marker.addTo(map);
       displayedMarkers.push({ marker, deployment: r });
       bounds.push([lat, lng]);
+      console.log("[MARKER] Added marker for:", r.Station, "Lat:", lat, "Lng:", lng);
     });
 
     if(bounds.length){
@@ -653,7 +673,7 @@ function applyFilters(){
     console.log("[FILTER] Completed, markers:", displayedMarkers.length);
     showLoading(false);
   } catch(err) {
-    console.error("[FILTER] Error applying filters:", err);
+    console.error("[FILTER] Error applying filters:", err, "Stack:", err.stack);
     showLoading(false);
   }
 }
@@ -734,7 +754,7 @@ function renderPersonnelTable(filteredDeployments){
     toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${personRows.length})`;
     console.log("[RENDER PERSONNEL] Completed, rows:", personRows.length);
   } catch(err) {
-    console.error("[RENDER PERSONNEL] Error:", err);
+    console.error("[RENDER PERSONNEL] Error:", err, "Stack:", err.stack);
   }
 }
 
@@ -804,7 +824,7 @@ function renderCrimeTable(){
     }
     console.log("[RENDER CRIME] Completed");
   } catch(err) {
-    console.error("[RENDER CRIME] Error:", err);
+    console.error("[RENDER CRIME] Error:", err, "Stack:", err.stack);
   }
 }
 
@@ -839,7 +859,7 @@ function updateSummaryBox(filteredRows){
     }
     console.log("[UPDATE SUMMARY] Completed");
   } catch(err) {
-    console.error("[UPDATE SUMMARY] Error:", err);
+    console.error("[UPDATE SUMMARY] Error:", err, "Stack:", err.stack);
   }
 }
 
@@ -868,7 +888,7 @@ stationSelect.onchange = function(){
     console.log("[STATION FILTER] Changed to:", selectedStation);
     applyFilters();
   } catch(err) {
-    console.error("[STATION FILTER] Error:", err);
+    console.error("[STATION FILTER] Error:", err, "Stack:", err.stack);
   }
 };
 
@@ -878,7 +898,7 @@ shiftSelect.onchange = function(){
     console.log("[SHIFT FILTER] Changed to:", selectedShift);
     applyFilters();
   } catch(err) {
-    console.error("[SHIFT FILTER] Error:", err);
+    console.error("[SHIFT FILTER] Error:", err, "Stack:", err.stack);
   }
 };
 
@@ -888,7 +908,7 @@ typeSelect.onchange = function(){
     console.log("[TYPE FILTER] Changed to:", selectedType);
     applyFilters();
   } catch(err) {
-    console.error("[TYPE FILTER] Error:", err);
+    console.error("[TYPE FILTER] Error:", err, "Stack:", err.stack);
   }
 };
 
@@ -898,7 +918,7 @@ toggleLink.onclick = function(){
     console.log("[TOGGLE PERSONNEL] Expanded:", personnelExpanded);
     applyFilters();
   } catch(err) {
-    console.error("[TOGGLE PERSONNEL] Error:", err);
+    console.error("[TOGGLE PERSONNEL] Error:", err, "Stack:", err.stack);
   }
 };
 
@@ -910,7 +930,7 @@ refreshBtn.onclick = function(){
     console.log("[REFRESH BTN] Triggered");
     loadData();
   } catch(err) {
-    console.error("[REFRESH BTN] Error:", err);
+    console.error("[REFRESH BTN] Error:", err, "Stack:", err.stack);
   }
 };
 
