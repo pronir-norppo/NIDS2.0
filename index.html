@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS 2.0 - Fixed</title>
+  <title>NIDS 2.0</title>
   <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -507,11 +507,12 @@ function applyFilters(){
       const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
       console.log("[POPUP IMG VALUE]", r.Photo, r);
 
-      // Use CORS proxy for Google Drive URLs, fallback to test image for first marker
+      // Use raw URL for idx===1, fallback test image for idx===0, proxy for others
       const imgSrc = idx === 0 ? FALLBACK_TEST_IMAGE : 
+        (idx === 1 ? r.Photo.replace(/&amp;/g, '&') : 
         (r.Photo.includes('drive.google.com') ? 
           `${CORS_PROXY}${encodeURIComponent(r.Photo.replace(/&amp;/g, '&'))}` : 
-          r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG);
+          r.Photo.replace(/&amp;/g, '&') || PLACEHOLDER_IMG));
       console.log("[POPUP IMG SRC]", imgSrc);
 
       let popupHtml = `
@@ -544,31 +545,22 @@ function applyFilters(){
     <div class="popup-photo loading">
       <img src="${imgSrc}" 
            alt="photo"
-           onload="console.log('[IMG LOADED]', this.src); this.parentNode.classList.remove('loading');"
-           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, event); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
+           onload="console.log('[IMG LOADED]', this.src, 'Time:', new Date().toISOString()); this.parentNode.classList.remove('loading');"
+           onerror="console.log('[IMG FAILED]', this.src, 'Error:', event.type, 'Details:', event, 'Time:', new Date().toISOString()); this.src='${PLACEHOLDER_IMG}'; this.parentNode.classList.remove('loading');">
     </div>
   </div>
 `;
 
-      const icon = ICONS[r["Deployment Type"]] || ICONS["default"];
+      const icon = ICONS[r["Deployment Type"] || "default"];
       const marker = L.marker([r.Lat, r.Lng], { icon }).bindPopup(popupHtml, {
         maxWidth: 400,
         minWidth: 250,
         className: "custom-popup"
       });
 
-      // Force image reload with slight delay when popup opens
+      // Log popup open without forced image reload
       marker.on('popupopen', function() {
-        console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc);
-        const img = document.querySelector('.leaflet-popup-content .popup-photo img');
-        if (img) {
-          setTimeout(() => {
-            const originalSrc = img.src;
-            img.src = ''; // Reset src to force reload
-            img.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
-            console.log("[POPUP OPEN] Forced image reload:", img.src);
-          }, 100); // Slight delay to ensure DOM is ready
-        }
+        console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", imgSrc, "Time:", new Date().toISOString());
       });
 
       marker.addTo(map);
@@ -641,7 +633,7 @@ function renderPersonnelTable(filteredDeployments){
     tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
     tr.onclick = (ev) => {
       if(selectedRowEl) selectedRowEl.classList.remove("selected");
-      tr.classList.add("selected");
+      tr.className = "person-row selected";
       selectedRowEl = tr;
 
       const match = displayedMarkers.find(m => m.deployment === p.deployment);
