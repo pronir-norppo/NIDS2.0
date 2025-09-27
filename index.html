@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS 2.0 - Fixed</title>
+  <title>NIDS 2.0 - Test Deployment</title>
   <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -184,7 +184,7 @@
       <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
     </div>
 
-    <!-- MAIN: Map muod Summary -->
+    <!-- MAIN: Map + Summary -->
     <div class="main">
       <div id="map">
         <div id="summaryBox">Summary...</div>
@@ -203,7 +203,7 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://placehold.co/160x90?text=No+Photo";
-const FALLBACK_TEST_IMAGE = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=160&h=90"; // Reliable Unsplash image
+const FALLBACK_TEST_IMAGE = "https://images.unsplash.com/photo-1580130775562-0cd80adb43f8?ixlib=rb-4.0.3&auto=format&fit=crop&w=160&h=90"; // Police-related image
 const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
@@ -250,7 +250,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'
 
 /* Gold highlight style uses a circle marker */
 function addHighlight(latlng){
-  if(highlightLayer) try{ map.removeLayer(highlightLayer); } catch(e){ console.warn("remove highlight error", e); }
+  if(highlightLayer) try{ map.removeLayer(highlightLayer); } catch(e){ console.warn("[HIGHLIGHT] Remove error:", e); }
   highlightLayer = L.circleMarker(latlng, { radius:10, color: '#b8860b', weight:3, fillColor:'#ffcc00', fillOpacity:0.9, opacity:1 }).addTo(map);
 }
 
@@ -261,45 +261,65 @@ function addHighlight(latlng){
 function normalize(s){ return s ? String(s).trim().toLowerCase() : ""; }
 function showLoading(on){ loadingOverlay.classList.toggle("active", !!on); }
 
-/* Robust lat/lng extraction - supports many column name variants and "combined" columns */
+/* Robust lat/lng extraction - supports more edge cases */
 function parseLatLngFromRow(r){
-  const tryVals = (keys) => {
-    for(const k of keys){
-      if(r[k] !== undefined && r[k] !== null && String(r[k]).trim()!=="") return String(r[k]).trim();
+  try {
+    const tryVals = (keys) => {
+      for(const k of keys){
+        if(r[k] !== undefined && r[k] !== null && String(r[k]).trim()!=="") return String(r[k]).trim();
+      }
+      return "";
+    };
+
+    let combined = tryVals(["Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng","Coordinates","coords"]);
+    let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
+    let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
+
+    if(combined){
+      // Handle various separators (comma, slash, space, semicolon)
+      const parts = combined.split(/[,;\/\s]+/).map(p=>p.trim()).filter(Boolean);
+      if(parts.length >= 2){
+        const a = parseFloat(parts[0].replace(/[^\d\.\-]/g,'')), b = parseFloat(parts[1].replace(/[^\d\.\-]/g,''));
+        if(!isNaN(a) && !isNaN(b)) {
+          console.log("[PARSE LATLNG] Parsed combined:", combined, "Lat:", a, "Lng:", b);
+          return { lat: +a, lng: +b };
+        }
+      }
     }
-    return "";
-  };
 
-  let combined = tryVals(["Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng"]);
-  let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT"]);
-  let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon"]);
-
-  if(combined){
-    const parts = combined.split(/[,\/\s]+/).map(p=>p.trim()).filter(Boolean);
-    if(parts.length >= 2){
-      const a = parseFloat(parts[0].replace(/[^\d\.\-]/g,'')), b = parseFloat(parts[1].replace(/[^\d\.\-]/g,''));
-      if(!isNaN(a) && !isNaN(b)) return { lat: +a, lng: +b };
+    if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
+      const ps = latVal.split(/[,;\/\s]+/).map(p=>p.trim()).filter(Boolean);
+      if(ps.length>=2){
+        const a = parseFloat(ps[0]), b = parseFloat(ps[1]);
+        if(!isNaN(a) && !isNaN(b)) {
+          console.log("[PARSE LATLNG] Parsed lat comma:", latVal, "Lat:", a, "Lng:", b);
+          latVal = ps[0]; lngVal = ps[1];
+        }
+      }
     }
-  }
 
-  if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
-    const ps = latVal.split(/[,\/\s]+/).map(p=>p.trim()).filter(Boolean);
-    if(ps.length>=2){ const a=parseFloat(ps[0]), b=parseFloat(ps[1]); if(!isNaN(a) && !isNaN(b)) { latVal = ps[0]; lngVal = ps[1]; } }
-  }
+    let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
+    let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
 
-  let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
-  let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
+    function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
+    function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
 
-  function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
-  function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
-
-  if(!isNaN(lat) && !isNaN(lng)){
-    if(!inPHLat(lat) && inPHLat(lng) && !inPHLng(lng) && inPHLng(lat)){
-      const tmp = lat; lat = lng; lng = tmp;
+    if(!isNaN(lat) && !isNaN(lng)){
+      if(!inPHLat(lat) && inPHLat(lng) && !inPHLng(lng) && inPHLng(lat)){
+        const tmp = lat; lat = lng; lng = tmp;
+        console.log("[PARSE LATLNG] Swapped lat/lng:", lat, lng);
+      }
     }
-  }
 
-  return { lat: isNaN(lat) ? null : +lat, lng: isNaN(lng) ? null : +lng };
+    if(isNaN(lat) || isNaN(lng)){
+      console.warn("[PARSE LATLNG] Invalid lat/lng for row:", r, "LatVal:", latVal, "LngVal:", lngVal);
+    }
+
+    return { lat: isNaN(lat) ? null : +lat, lng: isNaN(lng) ? null : +lng };
+  } catch(err) {
+    console.error("[PARSE LATLNG] Error for row:", r, err);
+    return { lat: null, lng: null };
+  }
 }
 
 /* Small helper to escape HTML for popups */
@@ -345,7 +365,9 @@ async function loadData(){
   showLoading(true);
   console.log("[LOAD] Starting fetch of CSVs...");
   try{
+    console.log("[LOAD] Fetching CSVs...");
     const [depRows, crimeRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV) ]);
+    console.log("[LOAD] CSVs fetched, parsing data...");
 
     // Preload images and store in cache
     const imageUrls = depRows
@@ -378,11 +400,12 @@ async function loadData(){
           }
         }
 
-        console.log("[PHOTO FINAL]", url || PLACEHOLDER_IMG);
-        return url || PLACEHOLDER_IMG;
+        console.log("[PHOTO FINAL]", url || FALLBACK_TEST_IMAGE);
+        return url || FALLBACK_TEST_IMAGE;
       })
-      .filter(url => url !== PLACEHOLDER_IMG);
+      .filter(url => url !== FALLBACK_TEST_IMAGE);
 
+    console.log("[LOAD] Preloading images:", imageUrls);
     imageUrls.forEach(url => {
       const img = new Image();
       img.src = url;
@@ -392,7 +415,7 @@ async function loadData(){
       };
       img.onerror = () => {
         console.log("[PRELOAD] Failed:", url, "Time:", new Date().toISOString());
-        imageCache.set(url, PLACEHOLDER_IMG);
+        imageCache.set(url, FALLBACK_TEST_IMAGE);
       };
     });
 
@@ -411,14 +434,14 @@ async function loadData(){
         return { name: p, mobile: "" };
       });
 
-      return {
+      const rowData = {
         raw: r,
-        Station: (r.Station || r["Station -"] || "").toString().trim(),
-        Shift: (r.Shift || "").toString().trim(),
-        "Deployment Type": (r["Deployment Type"] || r.DeploymentType || "").toString().trim(),
-        Name: (r.Name || r["Name (Rank FName MI LName)"] || "").toString().trim(),
-        CallSign: (r["Call Sign"] || r.CallSign || "").toString().trim(),
-        Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim(),
+        Station: (r.Station || r["Station -"] || "").toString().trim() || "Unknown",
+        Shift: (r.Shift || "").toString().trim() || "Unspecified",
+        "Deployment Type": (r["Deployment Type"] || r.DeploymentType || "").toString().trim() || "Unspecified",
+        Name: (r.Name || r["Name (Rank FName MI LName)"] || "").toString().trim() || "Unnamed",
+        CallSign: (r["Call Sign"] || r.CallSign || "").toString().trim() || "",
+        Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim() || "",
         Photo: (function() {
           const keys = ["Photo", "photo", "PHOTO", "Photo URL", "Image", "Photo Link", "Image URL"];
           let url = "";
@@ -448,31 +471,43 @@ async function loadData(){
             }
           }
 
-          console.log("[PHOTO FINAL]", url || PLACEHOLDER_IMG);
-          return url || PLACEHOLDER_IMG;
+          console.log("[PHOTO FINAL]", url || FALLBACK_TEST_IMAGE);
+          return url || FALLBACK_TEST_IMAGE;
         })(),
-        Location: (r.Location || r.PatrolArea || "").toString().trim(),
+        Location: (r.Location || r.PatrolArea || "").toString().trim() || "",
         PersonnelList,
-        Lat: lat, Lng: lng,
+        Lat: lat,
+        Lng: lng,
         _rowIndex: idx
       };
-    }).filter(r => r.Station);
 
-    crimeData = (crimeRows || []).map(r => ({
-      raw: r,
-      Station: (r.Station || "").toString().trim(),
-      "Focus Crimes": (r["Focus Crimes"] || r["Focus Crime"] || r.Crime || "").toString().trim(),
-      Barangay: (r.Barangay || r.Brgy || r["Brgy"] || "").toString().trim(),
-      CaseStatus: (r["Case Status"] || r.Status || "").toString().trim()
-    })).filter(r => r.Station && r["Focus Crimes"]);
+      console.log("[LOAD] Parsed row:", rowData);
+      return rowData;
+    }); // Removed .filter(r => r.Station) to include all rows
 
+    crimeData = (crimeRows || []).map(r => {
+      const rowData = {
+        raw: r,
+        Station: (r.Station || "").toString().trim() || "Unknown",
+        "Focus Crimes": (r["Focus Crimes"] || r["Focus Crime"] || r.Crime || "").toString().trim() || "Unknown",
+        Barangay: (r.Barangay || r.Brgy || r["Brgy"] || "").toString().trim() || "Unknown",
+        CaseStatus: (r["Case Status"] || r.Status || "").toString().trim() || ""
+      };
+      console.log("[LOAD] Parsed crime row:", rowData);
+      return rowData;
+    }); // Removed .filter(r => r.Station && r["Focus Crimes"]) to include all rows
+
+    console.log("[LOAD] Parsed deployments count:", allData.length);
     console.log("[LOAD] Parsed deployments sample:", allData.slice(0,6));
+    console.log("[LOAD] Parsed crimes count:", crimeData.length);
     console.log("[LOAD] Parsed crimes sample:", crimeData.slice(0,6));
+    console.log("[LOAD] Calling refreshUI...");
     refreshUI();
   } catch(err){
-    console.error("[LOAD] Error loading CSVs:", err);
+    console.error("[LOAD] Error loading CSVs or parsing data:", err);
   } finally {
     showLoading(false);
+    console.log("[LOAD] Completed");
   }
 }
 
@@ -484,6 +519,7 @@ function refreshUI(){
   try {
     console.log("[REFRESH UI] Starting...");
     const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    console.log("[REFRESH UI] Stations:", stationSet);
     stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
 
     shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
@@ -491,9 +527,10 @@ function refreshUI(){
 
     selectedStation = "All"; selectedShift = "All"; selectedType = "All";
 
-    displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){} });
+    displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){ console.warn("[REFRESH UI] Remove marker error:", e); } });
     displayedMarkers = [];
 
+    console.log("[REFRESH UI] Calling applyFilters...");
     applyFilters();
     console.log("[REFRESH UI] Completed");
   } catch(err) {
@@ -513,24 +550,25 @@ function applyFilters(){
 
     const filtered = allData.filter(d =>
       (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
-      (selectedShift === "All"   || normalize(d.Shift) === normalize(selectedShift)) &&
-      (selectedType === "All"    || normalize(d["Deployment Type"]) === normalize(selectedType))
+      (selectedShift === "All" || normalize(d.Shift) === normalize(selectedShift)) &&
+      (selectedType === "All" || normalize(d["Deployment Type"]) === normalize(selectedType))
     );
+    console.log("[FILTER] Filtered deployments:", filtered.length, filtered.slice(0,3));
 
     displayedMarkers.forEach(mset => {
-      try{ map.removeLayer(mset.marker); } catch(e){}
+      try{ map.removeLayer(mset.marker); } catch(e){ console.warn("[FILTER] Remove marker error:", e); }
     });
     displayedMarkers = [];
 
     const bounds = [];
     filtered.forEach((r, idx) => {
       if(r.Lat != null && r.Lng != null){
-        const photoUrl = r.Photo ? r.Photo : PLACEHOLDER_IMG;
-        console.log("[POPUP IMG VALUE]", r.Photo, r);
+        const photoUrl = r.Photo || FALLBACK_TEST_IMAGE;
+        console.log("[POPUP IMG VALUE]", photoUrl, "Station:", r.Station);
 
-        // Use Unsplash for all markers for testing
-        const imgSrc = imageCache.get(photoUrl) || FALLBACK_TEST_IMAGE;
-        console.log("[POPUP IMG SRC]", imgSrc);
+        // Try cached image, then sheet photo, then fallback
+        const imgSrc = imageCache.get(photoUrl) || photoUrl;
+        console.log("[POPUP IMG SRC]", imgSrc, "Station:", r.Station);
 
         // Create popup content as DOM elements
         const popupDiv = document.createElement('div');
@@ -601,13 +639,17 @@ function applyFilters(){
         img.src = imgSrc;
         img.alt = 'photo';
         img.onload = () => {
-          console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Time:', new Date().toISOString());
+          console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Station:', r.Station, 'Time:', new Date().toISOString());
           photoDiv.classList.remove('loading');
         };
-        img.onerror = () => {
-          console.log('[IMG ERROR]', img.src, 'Time:', new Date().toISOString());
-          img.src = STATIC_TEST_IMAGE; // Fallback to base64 image
-          photoDiv.classList.remove('loading');
+        img.onerror = (err) => {
+          console.log('[IMG ERROR]', img.src, 'Station:', r.Station, 'Error:', err, 'Time:', new Date().toISOString());
+          img.src = FALLBACK_TEST_IMAGE;
+          img.onerror = () => {
+            console.log('[IMG ERROR] Fallback failed:', img.src, 'Station:', r.Station, 'Time:', new Date().toISOString());
+            img.src = STATIC_TEST_IMAGE;
+            photoDiv.classList.remove('loading');
+          };
         };
         photoDiv.appendChild(img);
         popupDiv.appendChild(photoDiv);
@@ -631,14 +673,16 @@ function applyFilters(){
           if (popupContainer) {
             const observer = new MutationObserver((mutations) => {
               mutations.forEach(m => {
-                console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Attribute:", m.attributeName || 'N/A', "Time:", new Date().toISOString());
+                console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Attribute:", m.attributeName || 'N/A', "Station:", r.Station, "Time:", new Date().toISOString());
                 if (m.type === 'attributes' && m.target.nodeName === 'IMG' && m.attributeName === 'src') {
-                  console.log("[POPUP MUTATION] Image src changed to:", m.target.src);
+                  console.log("[POPUP MUTATION] Image src changed to:", m.target.src, "Station:", r.Station);
                 }
               });
             });
             observer.observe(popupContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
             console.log("[POPUP OBSERVER] Started for", r.Station, "Image Complete:", img.complete);
+          } else {
+            console.warn("[POPUP OBSERVER] No popup container found for", r.Station);
           }
         });
 
@@ -655,7 +699,7 @@ function applyFilters(){
         displayedMarkers.push({ marker, deployment: r });
         bounds.push([r.Lat, r.Lng]);
       } else {
-        console.warn("[MARKER] Missing lat/lng for deployment:", r.Station, r.CallSign, r._rowIndex);
+        console.warn("[MARKER] Missing lat/lng for deployment:", r.Station, r.CallSign, r._rowIndex, "Lat:", r.Lat, "Lng:", r.Lng);
       }
     });
 
@@ -670,8 +714,11 @@ function applyFilters(){
       console.log("[MAP] No bounds, set default view");
     }
 
+    console.log("[FILTER] Rendering personnel table...");
     renderPersonnelTable(filtered);
+    console.log("[FILTER] Rendering crime table...");
     renderCrimeTable();
+    console.log("[FILTER] Updating summary box...");
     updateSummaryBox(filtered);
 
     console.log("[FILTER] Completed, markers:", displayedMarkers.length);
@@ -696,21 +743,23 @@ function renderPersonnelTable(filteredDeployments){
       if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
         dep.PersonnelList.forEach(p => {
           personRows.push({
-            name: p.name || dep.Name || "",
+            name: p.name || dep.Name || "Unnamed",
             mobile: p.mobile || "",
             CallSign: dep.CallSign || "",
-            Station: dep.Station || "",
-            lat: dep.Lat, lng: dep.Lng,
+            Station: dep.Station || "Unknown",
+            lat: dep.Lat,
+            lng: dep.Lng,
             deployment: dep
           });
         });
       } else {
         personRows.push({
-          name: dep.Name || "",
+          name: dep.Name || "Unnamed",
           mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "",
           CallSign: dep.CallSign || "",
-          Station: dep.Station || "",
-          lat: dep.Lat, lng: dep.Lng,
+          Station: dep.Station || "Unknown",
+          lat: dep.Lat,
+          lng: dep.Lng,
           deployment: dep
         });
       }
@@ -723,6 +772,7 @@ function renderPersonnelTable(filteredDeployments){
       return;
     }
 
+    console.log("[RENDER PERSONNEL] Personnel rows:", personRows.length, personRows.slice(0,3));
     const visible = personnelExpanded ? personRows : personRows.slice(0, 20);
     visible.forEach((p, idx) => {
       const tr = document.createElement("tr");
@@ -736,12 +786,12 @@ function renderPersonnelTable(filteredDeployments){
 
         const match = displayedMarkers.find(m => m.deployment === p.deployment);
         if(match){
-          try{ map.flyTo(match.marker.getLatLng(), 15, {animate:true, duration: 0.9}); } catch(e){}
+          try{ map.flyTo(match.marker.getLatLng(), 15, {animate:true, duration: 0.9}); } catch(e){ console.error("[PERSON CLICK] FlyTo error:", e); }
           match.marker.openPopup();
           addHighlight([match.deployment.Lat, match.deployment.Lng]);
           console.log("[PERSON CLICK] Selected person:", p.name, "deployment:", match.deployment.Station);
         } else if(p.lat && p.lng){
-          try{ map.flyTo([p.lat, p.lng], 15, {animate:true, duration:0.9}); } catch(e){}
+          try{ map.flyTo([p.lat, p.lng], 15, {animate:true, duration:0.9}); } catch(e){ console.error("[PERSON CLICK] FlyTo error:", e); }
           addHighlight([p.lat, p.lng]);
           console.log("[PERSON CLICK] No marker, but lat/lng used:", p);
         } else {
@@ -773,6 +823,7 @@ function renderCrimeTable(){
       return;
     }
 
+    console.log("[RENDER CRIME] Crime data:", crimeData.length, crimeData.slice(0,3));
     const station = stationSelect.value;
     if(station === "All"){
       const validStations = new Set(allData.map(d => d.Station));
@@ -885,22 +936,49 @@ stationSelect.onchange = function(){
       shiftSelect.disabled = false; typeSelect.disabled = false;
     }
 
+    console.log("[STATION FILTER] Changed to:", selectedStation);
     applyFilters();
   } catch(err) {
     console.error("[STATION FILTER] Error:", err);
   }
 };
 
-shiftSelect.onchange = function(){ selectedShift = shiftSelect.value; applyFilters(); };
-typeSelect.onchange  = function(){ selectedType = typeSelect.value; applyFilters(); };
+shiftSelect.onchange = function(){
+  try {
+    selectedShift = shiftSelect.value;
+    console.log("[SHIFT FILTER] Changed to:", selectedShift);
+    applyFilters();
+  } catch(err) {
+    console.error("[SHIFT FILTER] Error:", err);
+  }
+};
 
-toggleLink.onclick = function(){ personnelExpanded = !personnelExpanded; applyFilters(); };
+typeSelect.onchange = function(){
+  try {
+    selectedType = typeSelect.value;
+    console.log("[TYPE FILTER] Changed to:", selectedType);
+    applyFilters();
+  } catch(err) {
+    console.error("[TYPE FILTER] Error:", err);
+  }
+};
+
+toggleLink.onclick = function(){
+  try {
+    personnelExpanded = !personnelExpanded;
+    console.log("[TOGGLE PERSONNEL] Expanded:", personnelExpanded);
+    applyFilters();
+  } catch(err) {
+    console.error("[TOGGLE PERSONNEL] Error:", err);
+  }
+};
 
 refreshBtn.onclick = function(){
   try {
     selectedStation="All"; selectedShift="All"; selectedType="All";
     stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
     map.setView(defaultCenter, defaultZoom);
+    console.log("[REFRESH BTN] Triggered");
     loadData();
   } catch(err) {
     console.error("[REFRESH BTN] Error:", err);
@@ -911,6 +989,7 @@ refreshBtn.onclick = function(){
    INITIAL LOAD
    ===========================
 */
+console.log("[INIT] Starting initial load...");
 loadData();
 
 /* ===========================
