@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS 2.0 - Image Testing</title>
+  <title>NIDS 2.0 - Fixed</title>
   <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -46,7 +46,7 @@
     .table-container.expanded::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
     .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
     a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
-
+    
     /* POPUP: force block layout + wrapping for clearer lines */
     .leaflet-popup-content { white-space: normal !important; word-break: break-word !important; }
     .leaflet-popup-content-wrapper { max-width: 400px !important; }
@@ -59,7 +59,7 @@
     .popup-person .person-contact a.viber-link { color: #00bfff; font-weight:700; text-decoration:none; margin-right:6px; }
     .popup-person .person-contact a.call-link { margin-left:8px; text-decoration:none; }
     .popup-photo { margin-top:8px; }
-    .popup-photo img { display:block !important; max-width:160px !important; max-height:160px !important; border-radius:6px; margin-top:6px; display:block !important; visibility:visible !important; opacity:1 !important; }
+    .popup-photo img { display:block !important; max-width:160px !important; max-height:160px !important; border-radius:6px; visibility:visible !important; opacity:1 !important; }
 
     .popup-photo.loading::before {
       content: 'Loading image...';
@@ -69,7 +69,7 @@
       font-size: 12px;
       margin-bottom: 4px;
     }
-
+    
     /* Stylish popup card */
     .leaflet-popup-content-wrapper.custom-popup {
       background: #1f1f1f;
@@ -209,8 +209,30 @@
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
 const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const PLACEHOLDER_IMG = "https://via.placeholder.com/160x90.png";
+
+// Robust Google Drive image parser → uses thumbnail API
+function getImageUrl(rawUrl){
+  if(!rawUrl) return PLACEHOLDER_IMG;
+  let url = String(rawUrl).trim();
+  try {
+    if(url.includes("open?id=")){
+      const id = new URL(url).searchParams.get("id");
+      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
+    }
+    if(url.includes("/file/d/")){
+      const match = url.match(/\/file\/d\/([^/]+)\//);
+      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
+    }
+    if(url.startsWith("http")) return url;
+  } catch(e){
+    console.warn("[IMG PARSER] Failed:", rawUrl, e);
+  }
+  return PLACEHOLDER_IMG;
+}
+
+
 const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/160x90.png"; // Placeholder image
-const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
+const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -381,34 +403,6 @@ function makeContactLinks(mobile){
 }
 
 /* ===========================
-   NEW: Robust Google Drive image parser
-   ===========================
-*/
-function getImageUrl(rawUrl){
-  if(!rawUrl) return PLACEHOLDER_IMG;
-  let url = String(rawUrl).trim();
-  try {
-    // open?id=FILE_ID
-    if(url.includes("open?id=")){
-      const id = new URL(url).searchParams.get("id");
-      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
-    }
-    // /file/d/FILE_ID/
-    if(url.includes("/file/d/")){
-      const match = url.match(/\/file\/d\/([^/]+)\//);
-      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
-    }
-    // direct link already
-    if(url.startsWith("http")) {
-      return url;
-    }
-  } catch(e){
-    console.warn("[IMG PARSER] Failed to parse URL:", rawUrl, e);
-  }
-  return PLACEHOLDER_IMG;
-}
-
-/* ===========================
    CSV FETCH (with cache-busting)
    ===========================
 */
@@ -455,17 +449,16 @@ async function loadData(){
 
     allData = depRows.map((r, idx) => {
       const { lat, lng } = parseLatLngFromRow(r);
-
+	  
 	console.log("Row keys:", Object.keys(r));
 console.log("Personnel field raw value:", 
     r["Personnel (Rank_FName_MI_LName)"], 
     r.Personnel, 
     r["Personnel"]
 );
-
+	  
       const personnelRaw = (r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
-      const rawPersonnel = personnelRaw.split(/[
-;\/|]+|,(?=[^\)]*(?:\(|$))/).map(p=>p.trim()).filter(Boolean);
+      const rawPersonnel = personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/).map(p=>p.trim()).filter(Boolean);
 
       const PersonnelList = rawPersonnel.map(p=>{
         const inPar = p.match(/^(.*?)[\s\-]*\(?((\+?0?\d{9,13}))\)?\s*$/);
@@ -484,7 +477,7 @@ console.log("Personnel field raw value:",
         Name: (r.Name || r["Name (Rank FName MI LName)"] || "").toString().trim() || "Unnamed",
         CallSign: (r["Call Sign"] || r.CallSign || "").toString().trim() || "",
         Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim() || "",
-        Photo: getImageUrl(r.Photo || r["Photo"] || r["Photo URL"] || r.Image || ""), // <-- USE parser here
+        Photo: getImageUrl(r.Photo || r["Photo"] || r["Photo URL"] || r.Image || ""),
         Location: (r.Location || r.PatrolArea || "").toString().trim() || "",
         PersonnelList,
         Lat: lat,
@@ -595,7 +588,7 @@ function applyFilters(){
       // Create popup content as DOM elements
       const popupDiv = document.createElement('div');
       popupDiv.className = 'popup-card';
-
+      
       const header = document.createElement('div');
       header.className = 'popup-header';
       const h3 = document.createElement('h3');
