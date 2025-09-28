@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="author" content="PSSg Leong, RAC - PIDMU, NOrPPO, PRO NIR" />	
   <style>
     :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
     html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
@@ -217,11 +218,11 @@ function getImageUrl(rawUrl){
   try {
     if(url.includes("open?id=")){
       const id = new URL(url).searchParams.get("id");
-      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
+      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w420`;
     }
     if(url.includes("/file/d/")){
       const match = url.match(/\/file\/d\/([^/]+)\//);
-      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
+      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
     }
     if(url.startsWith("http")) return url;
   } catch(e){
