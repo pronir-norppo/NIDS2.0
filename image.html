@@ -51,7 +51,7 @@
       return results.data;
     }
 
-    // Robust Google Drive image parser
+    // Robust Google Drive image parser → uses thumbnail API
     function getImageUrl(rawUrl){
       if(!rawUrl) return PLACEHOLDER_IMG;
       let url = rawUrl.trim();
@@ -61,7 +61,7 @@
         if(url.includes("open?id=")){
           const id = new URL(url).searchParams.get("id");
           if(id) {
-            const finalUrl = `https://drive.google.com/uc?export=view&id=${id}`;
+            const finalUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
             console.log("[IMG DEBUG] Converted open?id= →", finalUrl);
             return finalUrl;
           }
@@ -71,7 +71,7 @@
         if(url.includes("/file/d/")){
           const match = url.match(/\/file\/d\/([^/]+)\//);
           if(match) {
-            const finalUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            const finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
             console.log("[IMG DEBUG] Converted file/d/... →", finalUrl);
             return finalUrl;
           }
