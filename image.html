@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NIDS Test with Photos</title>
+  <style>
+    #map { height: 500px; width: 100%; }
+    #loadingOverlay {
+      position: fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background: rgba(255,255,255,0.8);
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:bold;
+      z-index:9999;
+      display:none;
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <div id="loadingOverlay">Loading data...</div>
+  <div id="map"></div>
+
+  <script>
+    /*
+     ===========================
+       CONFIG / CONSTANTS
+     ===========================
+    */
+    const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
+    const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+
+    // Inline base64 placeholder (gray square, 100% offline)
+    const PLACEHOLDER_IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAACWCAIAAAD+5yT0AAAAK3RFWHRDcmVhdGlvbiBUaW1lAFNhdCAxMiBTZXAgMjAy7urhFwAAAAd0SU1FB+YHCw0TL8McF7gAAAGhSURBVHja7dixjcJAEEXR5j5m3qAPaAlMsJ0wTwJlzAIXazhbugzuDUFcPRl1b/H/70dNDO7xjoAAAAAAAAA8J8WcN6i/K3PaY5/J9O+V1YAAAAAAAAAAADgH4ABAwDWTMwZAAAAAElFTkSuQmCC";
+
+    let allData = [];
+
+    function showLoading(show){
+      document.getElementById("loadingOverlay").style.display = show ? "flex" : "none";
+    }
+
+    async function fetchCsv(url){
+      console.log("[FETCH CSV] Fetching:", url);
+      const response = await fetch(url);
+      if(!response.ok) throw new Error("Network error: "+response.status);
+      const text = await response.text();
+      const results = Papa.parse(text, { header:true, skipEmptyLines:true });
+      return results.data;
+    }
+
+    // Robust Google Drive image parser
+    function getImageUrl(rawUrl){
+      if(!rawUrl) return PLACEHOLDER_IMG;
+      let url = rawUrl.trim();
+
+      try {
+        // Case 1: open?id=FILE_ID
+        if(url.includes("open?id=")){
+          const id = new URL(url).searchParams.get("id");
+          if(id) {
+            const finalUrl = `https://drive.google.com/uc?export=view&id=${id}`;
+            console.log("[IMG DEBUG] Converted open?id= →", finalUrl);
+            return finalUrl;
+          }
+        }
+
+        // Case 2: file/d/FILE_ID/view
+        if(url.includes("/file/d/")){
+          const match = url.match(/\/file\/d\/([^/]+)\//);
+          if(match) {
+            const finalUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            console.log("[IMG DEBUG] Converted file/d/... →", finalUrl);
+            return finalUrl;
+          }
+        }
+
+        // Case 3: already usable
+        if(url.startsWith("http")) {
+          console.log("[IMG DEBUG] Using raw URL →", url);
+          return url;
+        }
+
+      } catch(e){
+        console.warn("[IMG PARSER] Failed:", rawUrl, e);
+      }
+
+      console.warn("[IMG DEBUG] Fallback for:", rawUrl);
+      return PLACEHOLDER_IMG;
+    }
+
+    async function loadData(){
+      showLoading(true);
+      console.log("[LOAD] Starting fetch of CSVs...");
+      try {
+        const [depRows, crimeRows] = await Promise.all([
+          fetchCsv(DEPLOYMENT_SHEET_CSV),
+          fetchCsv(CRIME_SHEET_CSV)
+        ]);
+        console.log("[LOAD] CSVs fetched, raw deployments:", depRows.slice(0,3), "raw crimes:", crimeRows.slice(0,3));
+
+        allData = depRows.map((row, idx) => {
+          const photoUrl = getImageUrl(row.Photo);
+          return {
+            ...row,
+            Photo: photoUrl
+          };
+        });
+
+        console.log("[LOAD] Parsed data sample:", allData.slice(0,3));
+        renderMap();
+
+      } catch(err){
+        console.error("[LOAD] Error loading CSVs or parsing data:", err);
+      } finally {
+        showLoading(false);
+        console.log("[LOAD] Completed");
+      }
+    }
+
+    function renderMap(){
+      const map = L.map("map").setView([9.3, 123.3], 9);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom:19,
+        attribution:"© OpenStreetMap"
+      }).addTo(map);
+
+      allData.forEach((row, idx) => {
+        if(!row.Lat_Long) return;
+        const [lat, lng] = row.Lat_Long.split(",").map(v => parseFloat(v));
+        if(isNaN(lat)||isNaN(lng)) return;
+
+        const popupHtml = `
+          <div>
+            <h4>${row.Station || "Unknown Station"}</h4>
+            <img src="${row.Photo}" 
+                 alt="Photo" 
+                 style="width:160px;height:auto;border:1px solid #ccc;" 
+                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"/>
+            <p><b>Shift:</b> ${row.Shift || ""}</p>
+            <p><b>Deployment Type:</b> ${row["Deployment Type"] || ""}</p>
+            <p><b>Personnel:</b> ${row["Personnel (Rank_FName_MI_LName)"] || ""}</p>
+            <p><b>Call Sign:</b> ${row["Call Sign"] || ""}</p>
+          </div>
+        `;
+
+        L.marker([lat,lng]).addTo(map).bindPopup(popupHtml);
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
