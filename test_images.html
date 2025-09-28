@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NIDS 2.0 - Fixed</title>
+  <!-- Leaflet & PapaParse -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    #map { height: 500px; width: 100%; }
+    #loadingOverlay {
+      position: fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background: rgba(255,255,255,0.8);
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:bold;
+      z-index:9999;
+      display:none;
+    }
+    .leaflet-popup-content img {max-width:160px; max-height:160px; border-radius:6px;}
+  </style>
+</head>
+<body>
+  <div id="loadingOverlay">Loading data...</div>
+  <div id="map"></div>
+
+<script>
+const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1xBoDI6UdfVjGTYCN6DQHoUj2tKJ-3vopgMYuwm_SbrU/gviz/tq?tqx=out:csv&gid=35222349";
+const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+const PLACEHOLDER_IMG = "https://via.placeholder.com/160x90.png";
+const FALLBACK_COORDS = { lat: 9.3, lng: 123.2 };
+
+// Google Drive image parser
+function getImageUrl(rawUrl){
+  if(!rawUrl) return PLACEHOLDER_IMG;
+  let url = rawUrl.trim();
+  try {
+    if(url.includes("open?id=")){
+      const id = new URL(url).searchParams.get("id");
+      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w320`;
+    }
+    if(url.includes("/file/d/")){
+      const match = url.match(/\/file\/d\/([^/]+)\//);
+      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
+    }
+    if(url.startsWith("http")) return url;
+  } catch(e){
+    console.warn("[IMG PARSER] Failed:", rawUrl, e);
+  }
+  return PLACEHOLDER_IMG;
+}
+
+async function fetchCsv(url){
+  const response = await fetch(url + "&t=" + Date.now());
+  const text = await response.text();
+  return Papa.parse(text, { header:true, skipEmptyLines:true }).data;
+}
+
+let allData = [];
+async function loadData(){
+  const [depRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV) ]);
+  allData = depRows.map((r, idx) => {
+    return {
+      Station: r.Station || "Unknown",
+      Shift: r.Shift || "",
+      "Deployment Type": r["Deployment Type"] || "",
+      Name: r.Name || "Unnamed",
+      CallSign: r["Call Sign"] || "",
+      Photo: getImageUrl(r.Photo || r["Photo"] || ""),
+      Lat: parseFloat((r.Lat || "").replace(/[^0-9\.-]/g, "")) || FALLBACK_COORDS.lat,
+      Lng: parseFloat((r.Lng || "").replace(/[^0-9\.-]/g, "")) || FALLBACK_COORDS.lng,
+      _rowIndex: idx
+    };
+  });
+  renderMap();
+}
+
+function renderMap(){
+  const map = L.map("map").setView([FALLBACK_COORDS.lat, FALLBACK_COORDS.lng], 9);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom:19,
+    attribution:"© OpenStreetMap"
+  }).addTo(map);
+
+  allData.forEach((row) => {
+    const lat = row.Lat || FALLBACK_COORDS.lat;
+    const lng = row.Lng || FALLBACK_COORDS.lng;
+    const popupHtml = `
+      <div>
+        <h4>${row.Station}</h4>
+        <img src="${row.Photo}" alt="Photo"
+             style="width:160px;height:auto;border:1px solid #ccc;"
+             onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"/>
+        <p><b>Shift:</b> ${row.Shift}</p>
+        <p><b>Deployment Type:</b> ${row["Deployment Type"]}</p>
+        <p><b>Call Sign:</b> ${row.CallSign}</p>
+      </div>
+    `;
+    L.marker([lat,lng]).addTo(map).bindPopup(popupHtml);
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
