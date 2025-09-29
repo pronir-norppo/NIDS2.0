@@ -278,7 +278,7 @@ const refreshBtn    = document.getElementById("refreshBtn");
    ===========================
 */
 const map = L.map('map').setView(defaultCenter, defaultZoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; PICTMU, NOrPPO, PRO NIR' }).addTo(map);
 
 /* Gold highlight style uses a circle marker */
 function addHighlight(latlng){
@@ -1055,6 +1055,24 @@ setInterval(() => {
   console.log("[AUTO REFRESH] Reloading data in background...");
   loadData();
 }, 60000);	
+
+// Added Security Layer
+// Disable right-click context menu
+document.addEventListener('contextmenu', event => event.preventDefault());
+
+// Disable common DevTools shortcuts
+document.addEventListener('keydown', function(e) {
+  if (
+    e.keyCode === 123 || // F12
+    (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
+    (e.ctrlKey && e.keyCode === 85) // Ctrl+U
+  ) {
+    e.preventDefault();
+    return false;
+  }
+});
+
+
 	
 </script>
 </body>
