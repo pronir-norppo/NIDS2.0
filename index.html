@@ -1054,6 +1054,13 @@ window.__nids_debug = {
   displayedMarkers
 };
 console.log("[INIT] nids debug hooks available at window.__nids_debug");
+
+// Auto refresh every 1 minute (60,000 ms)
+setInterval(() => {
+  console.log("[AUTO REFRESH] Reloading data in background...");
+  loadData();
+}, 60000);	
+	
 </script>
 </body>
 </html>
