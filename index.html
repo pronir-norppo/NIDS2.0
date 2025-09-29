@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS 2.0</title>
+  <title>NIDS v2.0</title>
   <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -872,9 +872,10 @@ function renderCrimeTable(){
       return;
     }
 
-    console.log("[RENDER CRIME] Crime data:", crimeData.length, crimeData.slice(0,3));
     const station = stationSelect.value;
+
     if(station === "All"){
+      // Default 8 focus crimes summary across all stations
       const validStations = new Set(allData.map(d => d.Station));
       const counts = {};
       crimeData.forEach(c => {
@@ -890,36 +891,29 @@ function renderCrimeTable(){
         crimeTbody.appendChild(tr);
       });
     } else {
+      // Show ALL crimes for this specific station, grouped by Barangay
       const normalized = normalize(station);
-      const exists = allData.some(d => normalize(d.Station) === normalized);
-      if(!exists){
-        crimeTbody.innerHTML = "<tr><td colspan=3>No crimes (station not in deployment)</td></tr>";
-        console.log("[RENDER CRIME] No crimes for station:", station);
+      const stationCrimes = crimeData.filter(c => normalize(c.Station) === normalized);
+      if(!stationCrimes.length){
+        crimeTbody.innerHTML = "<tr><td colspan=3>No crimes for this station</td></tr>";
         return;
       }
+
+      // group by Crime + Barangay
       const counts = {};
-      crimeData.forEach(c => {
-        if(normalize(c.Station) === normalized){
-          const key = (c["Focus Crimes"] || "(unknown)") + "|" + (c.Barangay || "(unknown)");
-          counts[key] = (counts[key] || 0) + 1;
-        }
+      stationCrimes.forEach(c => {
+        const crimeName = c["Focus Crimes"] || c.Crime || "(unknown)";
+        const brgy = c.Barangay || "(unknown)";
+        const key = crimeName + "|" + brgy;
+        counts[key] = (counts[key] || 0) + 1;
       });
-      FOCUS_CRIMES.forEach(cr=>{
-        const entries = Object.entries(counts).filter(([k]) => k.startsWith(cr + "|"));
-        if(entries.length){
-          entries.forEach(([key,cnt])=>{
-            const [, brgy] = key.split("|");
-            const tr = document.createElement("tr");
-            tr.className = "crime-row";
-            tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
-            crimeTbody.appendChild(tr);
-          });
-        } else {
-          const tr = document.createElement("tr");
-          tr.className = "crime-row muted";
-          tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>-</td><td><center>0</center></td>`;
-          crimeTbody.appendChild(tr);
-        }
+
+      Object.entries(counts).forEach(([key, cnt])=>{
+        const [crimeName, brgy] = key.split("|");
+        const tr = document.createElement("tr");
+        tr.className = "crime-row";
+        tr.innerHTML = `<td>${escapeHtml(crimeName)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
+        crimeTbody.appendChild(tr);
       });
     }
     console.log("[RENDER CRIME] Completed");
@@ -927,6 +921,7 @@ function renderCrimeTable(){
     console.error("[RENDER CRIME] Error:", err, "Stack:", err.stack);
   }
 }
+
 
 /* ===========================
    SUMMARY BOX
