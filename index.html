@@ -237,7 +237,7 @@ function getImageUrl(rawUrl){
 
 
 const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/160x90.png"; // Placeholder image
-const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
+const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
 const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
 const defaultCenter = [9.3, 123.2];
 const defaultZoom = 9;
@@ -368,7 +368,8 @@ function parseLatLngFromRow(r){
       return "";
     };
 
-    let combined = tryVals(["Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng","Coordinates","coords","Location"]);
+    // include the new header 'Lat_Long (e.g. 9.33805856, 123.3007679)'
+    let combined = tryVals(["Lat_Long (e.g. 9.33805856, 123.3007679)","Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng","Coordinates","coords","Location"]);
     let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
     let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
 
@@ -483,15 +484,16 @@ async function loadData(){
 
     allData = depRows.map((r, idx) => {
       const { lat, lng } = parseLatLngFromRow(r);
-
-      console.log("Row keys:", Object.keys(r));
-      console.log("Personnel field raw value:",
-          r["Personnel (Rank_FName_MI_LName)"],
-          r.Personnel,
-          r["Personnel"]
-      );
-
-      const personnelRaw = (r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
+	  
+	  console.log("Row keys:", Object.keys(r));
+	  console.log("Personnel field raw value:", 
+		    r["Personnel [Rank_FName_MI_LName] (Contact#)"],
+		    r["Personnel (Rank_FName_MI_LName)"],
+		    r.Personnel, 
+		    r["Personnel"]
+	  );
+	  
+      const personnelRaw = (r["Personnel [Rank_FName_MI_LName] (Contact#)"] || r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
       const rawPersonnel = personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/).map(p=>p.trim()).filter(Boolean);
 
       const PersonnelList = rawPersonnel.map(p=>{
