@@ -325,6 +325,40 @@ function debounce(func, wait) {
   };
 }
 
+/* Helper: robustly find a field value in a CSV row using several heuristics:
+   - exact keys passed
+   - trimmed-key match
+   - case-insensitive trimmed match
+   - substring match (fallback)
+*/
+function getField(row, ...keys) {
+  if(!row) return "";
+  // 1) direct exact match
+  for (const k of keys) {
+    if (k in row && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+  }
+  // 2) trimmed/normalized key exact match
+  const actualKeys = Object.keys(row);
+  for (const k of keys) {
+    const target = String(k || "").trim().toLowerCase();
+    for (const a of actualKeys) {
+      if (String(a).trim().toLowerCase() === target) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
+    }
+  }
+  // 3) substring fallback (if nothing found yet)
+  for (const a of actualKeys) {
+    const ak = String(a).toLowerCase();
+    for (const k of keys) {
+      if (ak.indexOf(String(k || "").trim().toLowerCase()) !== -1) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
+    }
+  }
+  return "";
+}
+
 /* Robust lat/lng extraction - supports more edge cases */
 function parseLatLngFromRow(r){
   try {
@@ -335,7 +369,27 @@ function parseLatLngFromRow(r){
       return "";
     };
 
-    let combined = tryVals(["Lat_Long","LatLong","Lat / Long","Lat_Long ","lat_long","latlong","Lat/Long","Latitude_Longitude","lat,lng","Coordinates","coords","Location"]);
+    let combined = tryVals([
+  "Lat_Long",
+  "Lat_Long (e.g. 9.33805856, 123.3007679)",
+  "Lat_Long (e.g. 9.33805856, 123.3007679",
+  "LatLong",
+  "Lat / Long",
+  "Lat_Long ",
+  "lat_long",
+  "latlong",
+  "Lat/Long",
+  "Latitude_Longitude",
+  "lat,lng",
+  "Coordinates",
+  "coords",
+  "Location"
+]);
+
+// fallback: use getField heuristics (handles trimmed keys / trailing spaces)
+if(!combined) combined = getField(r, "Lat_Long (e.g. 9.33805856, 123.3007679)", "Lat_Long", "LatLong", "Coordinates", "coords", "Location");
+	
+	
     let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
     let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
 
@@ -400,7 +454,7 @@ function makeContactLinks(mobile){
   if(/^\d{10,}$/.test(cleaned) && !/^\+/.test(plusNum)) plusNum = "+" + plusNum;
   const vlink = `viber://chat?number=${encodeURIComponent(plusNum)}`;
   const tel = `tel:${plusNum}`;
-  return `Mobile: <a class="viber-link" href="${vlink}" title="Open Viber">${escapeHtml(plusNum)}</a> <a href="${tel}" title="Call"></a>`;
+  return `<a class="viber-link" href="${vlink}" title="Open Viber">${escapeHtml(plusNum)}</a> <a href="${tel}" title="Call"></a>`;
 }
 
 /* ===========================
@@ -452,23 +506,37 @@ async function loadData(){
       const { lat, lng } = parseLatLngFromRow(r);
 	  
 	console.log("Row keys:", Object.keys(r));
-console.log("Personnel field raw value:", 
-    r["Personnel (Rank_FName_MI_LName)"], 
-    r.Personnel, 
-    r["Personnel"]
+// robust lookup for Personnel header variants (handles trailing spaces / header renames)
+const personnelFieldValue = getField(r,
+  "Personnel (Rank_FName_MI_LName)",
+  "Personnel (Rank_FName_MI_LName (Contact#) ",
+  "Personnel (Rank_FName_MI_LName (Contact#)",
+  "Personnel",
+  "Personnel (Rank_FName_MI_LName (Contact#) "
 );
-	  
-      const personnelRaw = (r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
-      const rawPersonnel = personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/).map(p=>p.trim()).filter(Boolean);
+console.log("Personnel field raw value (resolved):", personnelFieldValue);
 
-      const PersonnelList = rawPersonnel.map(p=>{
-        const inPar = p.match(/^(.*?)[\s\-]*\(?((\+?0?\d{9,13}))\)?\s*$/);
-        if(inPar){ return { name: inPar[1].trim(), mobile: inPar[2].trim() }; }
-        const dash = p.match(/^(.*?)[\s\-]+(\+?\d{9,13})$/);
-        if(dash) return { name: dash[1].trim(), mobile: dash[2].trim() };
-        if(/^\+?\d{9,13}$/.test(p)) return { name: "", mobile: p };
-        return { name: p, mobile: "" };
-      });
+// ensure rawPersonnel is always an array (avoid calling .map on string)
+const personnelRaw = (personnelFieldValue || r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
+// Parse into array of objects { name, mobile }
+const rawPersonnel = [];
+if (personnelRaw) {
+  personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/)
+    .map(p=>p.trim())
+    .filter(Boolean)
+    .forEach(entry => {
+      // Try to separate name and mobile (e.g. "PMSg Ray Anthony Leong (09553279424)")
+      const match = entry.match(/^(.*?)(\(?\+?\d{6,}\)?)$/);
+      if (match) {
+        rawPersonnel.push({
+          name: match[1].replace(/[()]/g,"").trim(),
+          mobile: match[2].replace(/[()]/g,"").trim()
+        });
+      } else {
+        rawPersonnel.push({ name: entry, mobile: "" });
+      }
+    });
+}
 
       const rowData = {
         raw: r,
@@ -480,7 +548,7 @@ console.log("Personnel field raw value:",
         Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim() || "",
         Photo: getImageUrl(r.Photo || r["Photo"] || r["Photo URL"] || r.Image || ""),
         Location: (r.Location || r.PatrolArea || "").toString().trim() || "",
-        PersonnelList,
+         PersonnelList: rawPersonnel,
         Lat: lat,
         Lng: lng,
         _rowIndex: idx
@@ -737,15 +805,15 @@ function applyFilters(){
     });
 
     if(bounds.length){
-      try{
-        const b = L.latLngBounds(bounds);
-        map.fitBounds(b.pad(0.2));
-        console.log("[MAP] Fit bounds:", bounds);
-        console.log("[MAP] Current zoom:", map.getZoom(), "Center:", map.getCenter());
-      } catch(e){ console.error("[MAP] fitBounds error:", e); }
-    } else {
-      map.setView(defaultCenter, defaultZoom);
-      console.log("[MAP] No bounds, set default view");
+  if (selectedStation !== "All") {
+    const b = L.latLngBounds(bounds);
+    map.fitBounds(b.pad(0.2));
+  } else {
+    map.setView(defaultCenter, defaultZoom);
+  }
+} else {
+  map.setView(defaultCenter, defaultZoom);
+  console.log("[MAP] No bounds, set default view");
     }
 
     console.log("[FILTER] Rendering personnel table...");
