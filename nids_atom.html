@@ -325,44 +325,115 @@ function debounce(func, wait) {
   };
 }
 
-
-/* =========================================================
-   UPDATED FIELD PARSING FOR NEW GOOGLE SHEET HEADERS
-   ========================================================= */
-function cleanHeaderKey(key){
-  if(!key) return "";
-  return String(key)
-    .replace(/\\r?\\n|\\r/g, " ")
-    .replace(/Note:.*/gi, "")
-    .replace(/\\(e\\.g[^\\)]*\\)/gi, "")
-    .replace(/\\s+/g, " ")
-    .replace(/\\s*:\\s*/g, ":")
-    .trim();
-}
-
-function getField(row, ...possible){
-  const keys = Object.keys(row);
-  for(const k of keys){
-    const cleaned = cleanHeaderKey(k).toLowerCase();
-    for(const p of possible){
-      if(cleaned === p.toLowerCase()) return row[k];
-      if(cleaned.includes(p.toLowerCase())) return row[k];
+/* Helper: robustly find a field value in a CSV row using several heuristics:
+   - exact keys passed
+   - trimmed-key match
+   - case-insensitive trimmed match
+   - substring match (fallback)
+*/
+function getField(row, ...keys) {
+  if(!row) return "";
+  // 1) direct exact match
+  for (const k of keys) {
+    if (k in row && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+  }
+  // 2) trimmed/normalized key exact match
+  const actualKeys = Object.keys(row);
+  for (const k of keys) {
+    const target = String(k || "").trim().toLowerCase();
+    for (const a of actualKeys) {
+      if (String(a).trim().toLowerCase() === target) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
+    }
+  }
+  // 3) substring fallback (if nothing found yet)
+  for (const a of actualKeys) {
+    const ak = String(a).toLowerCase();
+    for (const k of keys) {
+      if (ak.indexOf(String(k || "").trim().toLowerCase()) !== -1) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
     }
   }
   return "";
 }
 
+/* Robust lat/lng extraction - supports more edge cases */
 function parseLatLngFromRow(r){
-  const raw = getField(r,"Latitude, Longitude");
-  if(!raw) return {lat:9.3,lng:123.2};
-  const parts = String(raw).split(/[,;\\s]+/).filter(Boolean);
-  if(parts.length>=2){
-    const lat=parseFloat(parts[0]),lng=parseFloat(parts[1]);
-    if(!isNaN(lat)&&!isNaN(lng))return{lat,lng};
-  }
-  return {lat:9.3,lng:123.2};
-}
+  try {
+    const tryVals = (keys) => {
+      for(const k of keys){
+        if(r[k] !== undefined && r[k] !== null && String(r[k]).trim()!=="") return String(r[k]).trim();
+      }
+      return "";
+    };
 
+    let combined = tryVals([
+  "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ",
+  "Latitude, Longitude",
+  "Lat_Long",
+  "Lat_Long (e.g. 9.33805856, 123.3007679)",
+  "Lat_Long (e.g. 9.33805856, 123.3007679",
+  "LatLong",
+  "Lat / Long",
+  "Lat_Long ",
+  "lat_long",
+  "latlong",
+  "Lat/Long",
+  "Latitude_Longitude",
+  "lat,lng",
+  "Coordinates",
+  "coords",
+  "Location"
+]);
+
+// fallback: use getField heuristics (handles trimmed keys / trailing spaces)
+if(!combined) combined = getField(r, "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ", "Latitude, Longitude", "Lat_Long (e.g. 9.33805856, 123.3007679)", "Lat_Long", "LatLong", "Coordinates", "coords", "Location");
+	
+	
+    let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
+    let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
+
+    if(combined){
+      // Handle various separators (comma, semicolon, slash, space, parentheses)
+      const parts = combined.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
+      if(parts.length >= 2){
+        const a = parseFloat(parts[0].replace(/[^\d\.\-]/g,'')), b = parseFloat(parts[1].replace(/[^\d\.\-]/g,''));
+        if(!isNaN(a) && !isNaN(b)) {
+          console.log("[PARSE LATLNG] Parsed combined:", combined, "Lat:", a, "Lng:", b);
+          return { lat: +a, lng: +b };
+        }
+      }
+    }
+
+    if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
+      const ps = latVal.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
+      if(ps.length>=2){
+        const a = parseFloat(ps[0]), b = parseFloat(ps[1]);
+        if(!isNaN(a) && !isNaN(b)) {
+          console.log("[PARSE LATLNG] Parsed lat comma:", latVal, "Lat:", a, "Lng:", b);
+          latVal = ps[0]; lngVal = ps[1];
+        }
+      }
+    }
+
+    let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
+    let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
+
+    function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
+    function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
+
+    if(!isNaN(lat) && !isNaN(lng)){
+      if(!inPHLat(lat) && inPHLat(lng) && !inPHLng(lng) && inPHLng(lat)){
+        const tmp = lat; lat = lng; lng = tmp;
+        console.log("[PARSE LATLNG] Swapped lat/lng:", lat, lng);
+      }
+    }
+
+    if(isNaN(lat) || isNaN(lng)){
+      console.warn("[PARSE LATLNG] Invalid lat/lng for row:", r, "LatVal:", latVal, "LngVal:", lngVal);
+      return FALLBACK_COORDS; // Use fallback coordinates
     }
 
     console.log("[PARSE LATLNG] Success:", { lat, lng });
@@ -439,6 +510,7 @@ async function loadData(){
 	console.log("Row keys:", Object.keys(r));
 // robust lookup for Personnel header variants (handles trailing spaces / header renames)
 const personnelFieldValue = getField(r,
+  "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ",
   "Personnel (Rank_FName_MI_LName)",
   "Personnel (Rank_FName_MI_LName (Contact#) ",
   "Personnel (Rank_FName_MI_LName (Contact#)",
@@ -448,54 +520,53 @@ const personnelFieldValue = getField(r,
 console.log("Personnel field raw value (resolved):", personnelFieldValue);
 
 // ensure rawPersonnel is always an array (avoid calling .map on string)
-const personnelRaw = (personnelFieldValue || r["Personnel (Rank_FName_MI_LName)"] || r.Personnel || r["Personnel"] || "").toString();
+const personnelRaw = (personnelFieldValue || "").toString();
 // Parse into array of objects { name, mobile }
 const rawPersonnel = [];
 if (personnelRaw) {
-  personnelRaw.split(/[\n;\/|]+|,(?=[^\)]*(?:\(|$))/)
+  personnelRaw.split(",")
     .map(p=>p.trim())
     .filter(Boolean)
     .forEach(entry => {
-      // Try to separate name and mobile (e.g. "PMSg Ray Anthony Leong (09553279424)")
-      const match = entry.match(/^(.*?)(\(?\+?\d{6,}\)?)$/);
-      if (match) {
-        rawPersonnel.push({
-          name: match[1].replace(/[()]/g,"").trim(),
-          mobile: match[2].replace(/[()]/g,"").trim()
-        });
-      } else {
-        rawPersonnel.push({ name: entry, mobile: "" });
-      }
+      rawPersonnel.push({ name: entry, mobile: "" });
     });
+}
+
+// Assign contact to the first personnel (team leader)
+const contactFieldValue = getField(r,
+  "Contact Number: Note: Only the number of the team leader (or most senior member) is required. ",
+  "Contact Number",
+  "Mobile",
+  "Mobile No",
+  "Mobile#"
+);
+const contact = (contactFieldValue || "").toString().trim();
+if (contact && rawPersonnel.length > 0) {
+  rawPersonnel[0].mobile = contact;
 }
 
       const rowData = {
         raw: r,
-        Station: (r.Station || r["Station -"] || "").toString().trim() || "Unknown",
-        Shift: (r.Shift || "").toString().trim() || "Unspecified",
-        "Deployment Type": (r["Deployment Type"] || r.DeploymentType || "").toString().trim() || "Unspecified",
-        Name: (r.Name || r["Name (Rank FName MI LName)"] || "").toString().trim() || "Unnamed",
-        CallSign: (r["Call Sign"] || r.CallSign || "").toString().trim() || "",
-        Communication_Capability: (r["Communication Capability"] || r.Communication || "").toString().trim() || "",
-        Photo: getImageUrl(r.Photo || r["Photo"] || r["Photo URL"] || r.Image || ""),
-        Location: (r.Location || r.PatrolArea || "").toString().trim() || "",
-         PersonnelList: rawPersonnel,
+        Station: getField(r, "Station/Unit", "Station -", "Station") || "Unknown",
+        Shift: getField(r, "Duty Shift:", "Shift") || "Unspecified",
+        "Deployment Type": getField(r, "Types Deployment:", "Deployment Type", "DeploymentType") || "Unspecified",
+        Name: getField(r, "Name (Rank FName MI LName)", "Name") || (rawPersonnel.length > 0 ? rawPersonnel[0].name : "Unnamed"),
+        CallSign: getField(r, "Call Sign:", "Call Sign", "CallSign") || "",
+        Location: getField(r, "Deployment Area", "Location", "Location/Barangay") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp:", "Picture with timestamp", "Photo", "Picture")),
+        PersonnelList: rawPersonnel,
         Lat: lat,
-        Lng: lng,
-        _rowIndex: idx
+        Lng: lng
       };
-
-      console.log("[LOAD] Parsed row:", rowData);
+      console.log("[LOAD] Parsed deployment row:", rowData);
       return rowData;
-    });
+    }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0); // Optional: filter invalid rows
 
-    crimeData = (crimeRows || []).map(r => {
+    crimeData = crimeRows.map(r => {
       const rowData = {
-        raw: r,
-        Station: (r.Station || "").toString().trim() || "Unknown",
-        "Focus Crimes": (r["Focus Crimes"] || r["Focus Crime"] || r.Crime || "").toString().trim() || "Unknown",
-        Barangay: (r.Barangay || r.Brgy || r["Brgy"] || "").toString().trim() || "Unknown",
-        CaseStatus: (r["Case Status"] || r.Status || "").toString().trim() || ""
+        Station: getField(r, "Station") || "Unknown",
+        "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
+        Barangay: getField(r, "Barangay") || ""
       };
       console.log("[LOAD] Parsed crime row:", rowData);
       return rowData;
