@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NIDS v2.0 - Auto Shift</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="author" content="PSSg Leong, RAC - PIDMU, NOrPPO, PRO NIR" />	
+  <style>
+    :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
+    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
+    .app{display:flex;height:100vh}
+    .sidebar {width: 28%; padding: 16px; background: var(--panel); box-sizing: border-box; overflow-y: auto; scrollbar-width: none;}
+    .sidebar::-webkit-scrollbar {display: none;}
+    h1{margin:0 0 10px 0;color:var(--gold);font-size:16px}
+    h2{margin:0 0 10px 0;color:var(--gold);font-size:12px}
+    label{display:block;font-size:13px;color:#ddd;margin:10px 0 6px}
+    select{width:100%;padding:8px;border-radius:6px;background:#2b2b2b;border:1px solid #333;color:#fff}
+    button{margin-top:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
+    th{background:#2a2a2a;color:var(--gold);text-align:left}
+    .crime-row{cursor:default}
+    .crime-row.muted{opacity:0.35; pointer-events: none;}
+    .person-row{cursor:pointer}
+    .person-row.muted{opacity:0.45}
+    .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
+    #personnelTable td, #personnelTable th{font-size:11px;}
+    #crimeTable td, #personnelTable th{font-size:11px;}
+    .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
+    #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
+    #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.6); z-index:9999;pointer-events:none;opacity:0;transition:opacity .28s;}
+    #loadingOverlay.active{pointer-events:all;opacity:1}
+    .spinner{width:48px;height:48px;border-radius:50%;border:6px solid #222;border-top-color:var(--gold);animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #summaryBox{ position:absolute; bottom:12px; left:12px; background:black; color:yellow; padding:6px; border-radius:4px; font-size:11px; font-weight:500; z-index:500; max-width:360px; max-height:260px; overflow:auto; opacity:0.95;}
+    #summaryBox table{border-collapse:collapse;}
+    #summaryBox td{padding:2px 6px; border:1px solid #555; font-size:11px;}
+    .leaflet-popup-content img {max-width:160px; max-height:160px; border-radius:6px; margin-top:6px; display:block !important; visibility:visible !important; opacity:1 !important;}
+    .table-container { max-height: 110px; overflow-y: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.3s ease; }
+    .table-container.expanded { max-height: 380px; overflow-y: auto; scrollbar-width: thin; }
+    .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
+    a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
+
+    /* Current Shift Badge */
+    #currentShiftBadge {
+      display: inline-block;
+      background: #ffcc00;
+      color: #000;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 10px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
+    }
+
+    /* Rest of your existing styles... */
+    .leaflet-popup-content-wrapper.custom-popup { background: #1f1f1f; border-radius: 12px; padding: 0; box-shadow: 0 4px 18px rgba(0,0,0,0.5); color: #eee; }
+    .popup-card { padding: 12px 14px; max-width: 380px; }
+    .popup-header h3 { margin: 0; font-size: 15px; color: #000; background: rgba(255,204,0,0.15); padding: 4px 8px; border-radius: 6px; display: inline-block; }
+    .popup-callsign { font-size: 12px; background: rgba(255,204,0,0.15); padding: 2px 6px; border-radius: 6px; }
+    .popup-person .person-name { font-weight: 600; color: #9C2007; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <h1>NIDS 2.0 <button id="refreshBtn">Refresh</button>
+        <span id="currentShiftBadge">Loading...</span>
+      </h1>
+
+      <label for="stationFilter">Station</label>
+      <select id="stationFilter"><option value="All">All</option></select>
+
+      <label for="shiftFilter">Shift (Auto: <span id="autoShiftText">?</span>)</label>
+      <select id="shiftFilter" disabled><option value="All">All</option></select>
+
+      <label for="typeFilter">Deployment Type</label>
+      <select id="typeFilter" disabled><option value="All">All</option></select>
+
+      <h2 style="margin-top:16px">Personnel</h2>
+      <div id="personnelContainer" class="table-container">
+        <table id="personnelTable">
+          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
+
+      <h2 style="margin-top:20px">8 Focus Crimes</h2>
+      <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="main">
+      <div id="map">
+        <div id="summaryBox">Loading shift data...</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingOverlay"><div class="spinner"></div></div>
+
+<script>
+/* ===========================
+   CONFIG & AUTO SHIFT LOGIC
+   ===========================
+*/
+const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+
+const PLACEHOLDER_IMG = "https://via.placeholder.com/160x90.png";
+const FALLBACK_COORDS = { lat: 9.3, lng: 123.2 };
+const defaultCenter = [9.3, 123.2];
+const defaultZoom = 9;
+
+let allData = [], crimeData = [], displayedMarkers = [];
+let selectedStation = "All", selectedShift = "All", selectedType = "All";
+let autoShiftMode = true;  // <--- This enables auto shift
+
+const currentShiftBadge = document.getElementById("currentShiftBadge");
+const autoShiftText = document.getElementById("autoShiftText");
+
+// Auto-detect current shift
+function getCurrentShift() {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const totalMinutes = hours * 60 + minutes;
+
+  const isFirstShift = totalMinutes >= 360 && totalMinutes < 1080; // 6:00 AM → 5:59 PM (360–1079 mins)
+  
+  if (isFirstShift) {
+    return { shift: "1st Shift", label: "1ST SHIFT", time: "6:00 AM - 5:59 PM" };
+  } else {
+    return { shift: "2nd Shift", label: "2ND SHIFT", time: "6:00 PM - 5:59 AM" };
+  }
+}
+
+// Update badge + auto text
+function updateShiftDisplay() {
+  const { label, time, shift } = getCurrentShift();
+  currentShiftBadge.textContent = label;
+  autoShiftText.textContent = `${shift} (${time})`;
+
+  if (autoShiftMode) {
+    selectedShift = shift;
+    document.getElementById("shiftFilter").value = shift;
+  }
+}
+
+// Call every minute
+setInterval(updateShiftDisplay, 60000);
+updateShiftDisplay(); // Initial call
+
+/* ===========================
+   REST OF YOUR CODE (unchanged except minor fixes)
+   ===========================
+*/
+// ... [All your existing functions: getField, parseLatLngFromRow, getImageUrl, etc.] ...
+
+function getField(row, ...keys) {
+  if(!row) return "";
+  for (const k of keys) {
+    if (k in row && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+  }
+  const actualKeys = Object.keys(row);
+  for (const k of keys) {
+    const target = String(k || "").trim().toLowerCase();
+    for (const a of actualKeys) {
+      if (String(a).trim().toLowerCase() === target && row[a]) return row[a];
+    }
+  }
+  return "";
+}
+
+function parseLatLngFromRow(r){
+  try {
+    const combined = getField(r, "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ", "Latitude, Longitude");
+    if (combined) {
+      const parts = combined.split(/[,;\/\s]+/).map(p=>p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+      }
+    }
+    return FALLBACK_COORDS;
+  } catch(e) { return FALLBACK_COORDS; }
+}
+
+function getImageUrl(rawUrl){
+  if (!rawUrl) return PLACEHOLDER_IMG;
+  const url = String(rawUrl).trim();
+  const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
+  return url.startsWith("http") ? url : PLACEHOLDER_IMG;
+}
+
+function makeContactLinks(mobile){
+  const cleaned = (mobile||"").toString().replace(/\s+/g,'');
+  if(!cleaned) return '';
+  let plusNum = cleaned.startsWith("0") ? "+63" + cleaned.slice(1) : cleaned;
+  if (/^\d{10,}$/.test(cleaned)) plusNum = "+" + plusNum;
+  const vlink = `viber://chat?number=${encodeURIComponent(plusNum)}`;
+  const tel = `tel:${plusNum}`;
+  return `<a class="viber-link" href="${vlink}">${plusNum}</a>`;
+}
+
+function fetchCsv(url){
+  return fetch(url + "?t=" + Date.now(), {cache: "no-store"})
+    .then(r => r.ok ? r.text() : Promise.reject("Network error"))
+    .then(text => Papa.parse(text, { header: true, skipEmptyLines: true }).data)
+    .catch(err => { console.error(err); throw err; });
+}
+
+/* LOAD DATA */
+async function loadData(){
+  showLoading(true);
+  try {
+    const [depRows, crimeRows] = await Promise.all([fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV)]);
+
+    allData = depRows.map(r => {
+      const personnelRaw = getField(r, "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ");
+      const personnelList = personnelRaw ? personnelRaw.split(",").map(p => ({ name: p.trim(), mobile: "" })) : [];
+      const contact = getField(r, "Contact Number: Note: Only the number of the team leader (or most senior member) is required. ");
+      if (contact && personnelList.length > 0) personnelList[0].mobile = contact.trim();
+
+      const { lat, lng } = parseLatLngFromRow(r);
+
+      return {
+        raw: r,
+        Station: getField(r, "Station/Unit") || "Unknown",
+        Shift: getField(r, "Duty Shift:") || "Unspecified",
+        "Deployment Type": getField(r, "Types Deployment:") || "Unspecified",
+        CallSign: getField(r, "Call Sign:") || "",
+        Location: getField(r, "Deployment Area") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp:")),
+        PersonnelList: personnelList,
+        Name: personnelList.length > 0 ? personnelList[0].name : "Unnamed",
+        Lat: lat,
+        Lng: lng
+      };
+    });
+
+    crimeData = crimeRows.map(r => ({
+      Station: getField(r, "Station") || "Unknown",
+      "Focus Crimes": getField(r, "Focus Crimes") || "",
+      Barangay: getField(r, "Barangay") || ""
+    }));
+
+    refreshUI();
+    updateShiftDisplay();
+    applyFilters(); // Re-apply with correct auto shift
+  } catch(err) {
+    console.error("Load error:", err);
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* APPLY FILTERS - Now respects auto shift */
+function applyFilters(){
+  const filtered = allData.filter(d =>
+    (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
+    (selectedShift === "All" || normalize(d.Shift) === normalize(selectedShift)) &&
+    (selectedType === "All" || normalize(d["Deployment Type"]) === normalize(selectedType))
+  );
+
+  // ... [rest of your marker rendering logic] ...
+  // Keep your existing applyFilters() body, just make sure selectedShift is updated by auto system
+}
+
+/* Turn OFF auto shift if user manually selects */
+document.getElementById("shiftFilter").onchange = function() {
+  autoShiftMode = this.value === "All" || !["1st Shift", "2nd Shift"].includes(this.value);
+  selectedShift = this.value;
+  applyFilters();
+};
+
+/* INITIALIZE */
+const map = L.map('map').setView(defaultCenter, defaultZoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; PICTMU, NOrPPO, PRO NIR'
+}).addTo(map);
+
+function showLoading(on) {
+  document.getElementById("loadingOverlay").classList.toggle("active", !!on);
+}
+
+function normalize(s) { return s ? String(s).trim().toLowerCase() : ""; }
+
+// Start everything
+loadData();
+setInterval(() => { if (autoShiftMode) loadData(); }, 600000); // Auto refresh every 10 mins
+
+// Refresh button resets to auto
+document.getElementById("refreshBtn").onclick = () => {
+  autoShiftMode = true;
+  selectedStation = selectedShift = selectedType = "All";
+  document.getElementById("stationFilter").value = "All";
+  loadData();
+};
+</script>
+</body>
+</html>
