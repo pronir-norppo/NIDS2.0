@@ -4,7 +4,10 @@
   <meta charset="utf-8" />
   <title>NIDS v2.0</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -24,29 +27,20 @@
     table{width:100%;border-collapse:collapse;font-size:12px;}
     th,td{padding:6px;border:1px solid #333;}
     th{background:#2a2a2a;color:var(--gold);}
-    .person-row{cursor:pointer;}
-    .person-row.selected{background:rgba(255,204,0,0.15);font-weight:bold;}
     .main{flex:1;position:relative;}
-    #map{width:100%;height:100%;border-radius:8px;}
-    
-    /* SUMMARY BOX – FIXED FONT */
+    #map{width:100%;height:100%;}
     #summaryBox{
       position:absolute; bottom:12px; left:12px; background:#000; color:yellow; 
       padding:6px; border-radius:4px; font-size:11px; font-weight:500; 
-      z-index:1000; max-width:320px; max-height:200px; overflow:auto;
+      z-index:1000; max-width:300px; max-height:180px; overflow:auto;
     }
-    #summaryBox table{border-collapse:collapse;}
-    #summaryBox td{padding:2px 4px; border:1px solid #555; font-size:11px;}
-
-    #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
+    #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
     #loadingOverlay.active{opacity:1;pointer-events:all;}
     .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
-
     .table-container{max-height:120px;overflow:hidden;transition:max-height .3s;}
     .table-container.expanded{max-height:400px;overflow-y:auto;}
     .toggle-link{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px;display:block;}
-
     #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
     .login-box{background:#1f1f1f;padding:24px;border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
     .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;}
@@ -59,11 +53,14 @@
     .export-btns button{flex:1;font-size:11px;}
     #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
 
-    /* ICONS – RESTORED */
-    .icon-patrol { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-car.png') no-repeat center; background-size: contain; }
-    .icon-checkpoint { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/road-block.png') no-repeat center; background-size: contain; }
-    .icon-mobile { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-officer.png') no-repeat center; background-size: contain; }
-    .icon-station { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-station.png') no-repeat center; background-size: contain; }
+    /* TINY ICONS */
+    .icon-patrol, .icon-checkpoint, .icon-mobile, .icon-station {
+      width: 28px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center;
+    }
+    .icon-patrol { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="%2300bfff" d="M32 8L12 24v16l20 16 20-16V24L32 8z"/></svg>'); }
+    .icon-checkpoint { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="%23ff4444"/><path fill="%23fff" d="M20 32l8 8 16-16"/></svg>'); }
+    .icon-mobile { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18" fill="%2300bfff"/><path fill="%23fff" d="M28 32h8v8h-8z"/></svg>'); }
+    .icon-station { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="18" width="28" height="28" fill="%23ffcc00"/><path fill="%23000" d="M24 24h16v16H24z"/></svg>'); }
   </style>
 </head>
 <body>
@@ -144,7 +141,7 @@ const USERS = {
 
 let currentUser = null;
 let allData = [], crimeData = [];
-let displayedMarkers = [];
+let markerCluster = null;
 let selectedStation = "All", selectedShift = "All", selectedType = "All";
 let personnelExpanded = false;
 
@@ -159,7 +156,13 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== FIELD MATCHER =========================== */
+/* =========================== MAP + CLUSTER =========================== */
+const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
+map.addLayer(markerCluster);
+
+/* =========================== FIELD & LAT/LNG =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
   const rowLower = {};
@@ -176,75 +179,50 @@ function getField(row, ...keys) {
   return "";
 }
 
-/* =========================== LAT/LNG + ICONS =========================== */
 function parseLatLngFromRow(r) {
   const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
-  if (!latField) return { lat: 9.3, lng: 123.2 };
+  if (!latField) return null;
   const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
   if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-  return { lat: 9.3, lng: 123.2 };
+  return null;
 }
 
 function getIcon(type) {
-  const icons = {
-    "Patrol": "icon-patrol",
-    "Checkpoint": "icon-checkpoint",
-    "Mobile Patrol": "icon-mobile",
-    "Station": "icon-station"
-  };
+  const icons = { "Patrol": "icon-patrol", "Checkpoint": "icon-checkpoint", "Mobile Patrol": "icon-mobile", "Station": "icon-station" };
   const cls = icons[type] || "icon-patrol";
-  return L.divIcon({
-    className: "custom-icon",
-    html: `<div class="${cls}"></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32]
-  });
+  return L.divIcon({ className: "custom-icon", html: `<div class="${cls}"></div>`, iconSize: [28, 28], iconAnchor: [14, 28] });
 }
 
-/* =========================== LOGIN =========================== */
-document.getElementById("loginBtn").onclick = () => {
-  const u = document.getElementById("username").value.trim().toLowerCase();
-  const p = document.getElementById("password").value;
-  const chk = document.getElementById("rememberMeChk").checked;
-  if (USERS[u] && USERS[u].pass === p) {
-    currentUser = USERS[u];
-    document.getElementById("loginModal").remove();
-    document.querySelector(".app").style.display = "flex";
-    document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
-    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
-    initApp();
-  } else alert("Invalid credentials");
-};
-
-if (localStorage.getItem('nids_user')) {
-  currentUser = JSON.parse(localStorage.getItem('nids_user'));
-  document.querySelector(".app").style.display = "flex";
-  document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
-  document.getElementById("loginModal").remove();
-  initApp();
-}
-
-/* =========================== MAP (FULL SCREEN FOR ALL) =========================== */
-const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-/* =========================== DATA URLS =========================== */
+/* =========================== CACHE + LOAD =========================== */
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
-/* =========================== LOAD DATA =========================== */
 async function loadData() {
   showLoading(true);
   try {
-    const [dep, crime] = await Promise.all([
-      fetch(DEPLOYMENT_SHEET_CSV).then(r => r.text()).then(t => Papa.parse(t, { header: true }).data),
-      fetch(CRIME_SHEET_CSV).then(r => r.text()).then(t => Papa.parse(t, { header: true }).data)
+    const cacheKey = 'nids_data_v1';
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, crime, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 5 * 60 * 1000) { // 5 min cache
+        allData = data; crimeData = crime;
+        refreshUI(); applyFilters();
+        showLoading(false);
+        return;
+      }
+    }
+
+    const [depText, crimeText] = await Promise.all([
+      fetch(DEPLOYMENT_SHEET_CSV).then(r => r.text()),
+      fetch(CRIME_SHEET_CSV).then(r => r.text())
     ]);
 
+    const dep = Papa.parse(depText, { header: true }).data;
+    const crime = Papa.parse(crimeText, { header: true }).data;
+
     allData = dep.map(r => {
-      const { lat, lng } = parseLatLngFromRow(r);
+      const coords = parseLatLngFromRow(r);
+      if (!coords) return null;
       const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
       const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
       const type = getField(r, "Types Deployment", "Deployment Type");
@@ -256,10 +234,10 @@ async function loadData() {
         Location: getField(r, "Deployment Area", "Location") || "",
         Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture")),
         PersonnelList: personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" })),
-        Lat: lat, Lng: lng,
+        Lat: coords.lat, Lng: coords.lng,
         Icon: getIcon(type)
       };
-    }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0);
+    }).filter(Boolean);
 
     crimeData = crime.map(r => ({
       Station: getField(r, "Station") || "Unknown",
@@ -267,11 +245,10 @@ async function loadData() {
       Barangay: getField(r, "Barangay") || ""
     }));
 
-    refreshUI();
-    forceCurrentShiftFilter();
-    applyFilters();
+    localStorage.setItem(cacheKey, JSON.stringify({ data: allData, crime: crimeData, timestamp: Date.now() }));
+    refreshUI(); applyFilters();
   } catch (e) {
-    summaryBox.innerHTML = "Error loading data.";
+    summaryBox.innerHTML = "Offline mode: Using cached data.";
     console.error(e);
   } finally {
     showLoading(false);
@@ -280,32 +257,17 @@ async function loadData() {
 
 function getImageUrl(url) {
   if (!url) return "";
-  try {
-    const match = url.match(/id=([^&]+)/);
-    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
-  } catch (e) {}
-  return url;
+  const match = url.match(/id=([^&]+)/);
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : url;
 }
 
 function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
-/* =========================== UI & FILTERS =========================== */
+/* =========================== FILTERS & MARKERS =========================== */
 function refreshUI() {
   const stations = [...new Set(allData.map(d => d.Station))].sort();
   stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
-  displayedMarkers.forEach(m => map.removeLayer(m.marker));
-  displayedMarkers = [];
-}
-
-function forceCurrentShiftFilter() {
-  const now = new Date().getHours();
-  const current = now >= 6 && now < 18 ? "1st Shift" : "2nd Shift";
-  const opt = Array.from(shiftSelect.options).find(o => o.textContent === current);
-  if (opt) {
-    shiftSelect.value = opt.value;
-    selectedShift = current;
-    shiftSelect.disabled = true;
-  }
+  markerCluster.clearLayers();
 }
 
 function applyFilters() {
@@ -318,46 +280,39 @@ function applyFilters() {
     (selectedType === "All" || d["Deployment Type"] === selectedType)
   );
 
-  displayedMarkers.forEach(m => map.removeLayer(m.marker));
-  displayedMarkers = [];
+  markerCluster.clearLayers();
   const bounds = [];
 
   filtered.forEach(r => {
-    const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon }).addTo(map);
+    const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon });
     const popup = `
-      <div style="max-width:300px;font-size:12px;">
-        <h3 style="margin:0 0 6px;background:rgba(255,204,0,0.15);padding:3px;color:#000;font-size:14px;">${r.Station}</h3>
+      <div style="max-width:280px;font-size:12px;">
+        <h3 style="margin:0 0 4px;background:rgba(255,204,0,0.15);padding:2px;color:#000;font-size:13px;">${r.Station}</h3>
         <b>Area:</b> ${r.Location}<br>
         <b>Shift:</b> ${r.Shift}<br>
         <b>Type:</b> ${r["Deployment Type"]}<br>
         <b>Callsign:</b> ${r.CallSign}<br>
-        ${r.PersonnelList.map(p => `<div style="margin:4px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
-        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:6px;border-radius:6px;" loading="lazy">` : ''}
+        ${r.PersonnelList.map(p => `<div style="margin:3px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
+        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:4px;border-radius:4px;" loading="lazy">` : ''}
       </div>`;
-    marker.bindPopup(popup, { maxWidth: 320 });
-    displayedMarkers.push({ marker, data: r });
+    marker.bindPopup(popup, { maxWidth: 300 });
+    markerCluster.addLayer(marker);
     bounds.push([r.Lat, r.Lng]);
   });
 
-  if (bounds.length) {
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-  } else {
-    map.setView([9.3, 123.2], 10);
-  }
-
+  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
   renderPersonnelTable(filtered);
   renderCrimeTable(station);
   updateSummaryBox(filtered, station);
 }
 
-/* =========================== TABLES & SUMMARY =========================== */
+/* =========================== TABLES =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
-  const rows = data.flatMap(d => d.PersonnelList.length ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })) : [{ name: "Unnamed", mobile: "", Station: d.Station, CallSign: d.CallSign }]);
+  const rows = data.flatMap(d => d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })));
   const visible = personnelExpanded ? rows : rows.slice(0, 5);
   visible.forEach(p => {
     const tr = document.createElement("tr");
-    tr.className = "person-row";
     tr.innerHTML = `<td>${p.name}</td><td>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</td><td>${p.CallSign}</td><td>${p.Station}</td>`;
     personnelTbody.appendChild(tr);
   });
@@ -380,7 +335,7 @@ function renderCrimeTable(station) {
 
 function updateSummaryBox(data, station) {
   const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
-  summaryBox.innerHTML = `<b>${station}</b><br>Total Personnel: ${total}<br>Shift: ${selectedShift}`;
+  summaryBox.innerHTML = `<b>${station}</b><br>Personnel: ${total}<br>Shift: ${selectedShift}`;
 }
 
 /* =========================== EXPORT =========================== */
@@ -407,7 +362,37 @@ async function exportToPDF() {
   pdf.save("NIDS_Report.pdf");
 }
 
-/* =========================== INIT =========================== */
+/* =========================== LOGIN & INIT =========================== */
+document.getElementById("loginBtn").onclick = () => {
+  const u = document.getElementById("username").value.trim().toLowerCase();
+  const p = document.getElementById("password").value;
+  const chk = document.getElementById("rememberMeChk").checked;
+  if (USERS[u] && USERS[u].pass === p) {
+    currentUser = USERS[u];
+    document.getElementById("loginModal").remove();
+    document.querySelector(".app").style.display = "flex";
+    document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
+    setTimeout(() => {
+      map.invalidateSize(); // FIX MAP
+      initApp();
+    }, 100);
+  } else alert("Invalid credentials");
+};
+
+if (localStorage.getItem('nids_user')) {
+  currentUser = JSON.parse(localStorage.getItem('nids_user'));
+  document.querySelector(".app").style.display = "flex";
+  document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+  document.getElementById("loginModal").remove();
+  setTimeout(() => {
+    map.invalidateSize();
+    initApp();
+  }, 100);
+}
+
 function initApp() {
   if (currentUser.role === "admin") {
     document.getElementById("adminControls").style.display = "block";
@@ -423,9 +408,7 @@ function initApp() {
   loadData();
 
   stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
-  shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
-  typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
-  refreshBtn.onclick = loadData;
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v1'); loadData(); };
 }
 </script>
 </body>
