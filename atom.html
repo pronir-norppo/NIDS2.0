@@ -53,14 +53,12 @@
     .export-btns button{flex:1;font-size:11px;}
     #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
 
-    /* TINY ICONS */
-    .icon-patrol, .icon-checkpoint, .icon-mobile, .icon-station {
-      width: 28px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center;
-    }
-    .icon-patrol { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="%2300bfff" d="M32 8L12 24v16l20 16 20-16V24L32 8z"/></svg>'); }
-    .icon-checkpoint { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="%23ff4444"/><path fill="%23fff" d="M20 32l8 8 16-16"/></svg>'); }
-    .icon-mobile { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18" fill="%2300bfff"/><path fill="%23fff" d="M28 32h8v8h-8z"/></svg>'); }
-    .icon-station { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="18" width="28" height="28" fill="%23ffcc00"/><path fill="%23000" d="M24 24h16v16H24z"/></svg>'); }
+    /* ICONS – RESTORED & COMPATIBLE WITH CLUSTER */
+    .icon-patrol { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="%2300bfff" d="M32 8L12 24v16l20 16 20-16V24L32 8z"/></svg>') center/contain no-repeat; }
+    .icon-checkpoint { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="%23ff4444"/><path fill="%23fff" d="M20 32l8 8 16-16"/></svg>') center/contain no-repeat; }
+    .icon-mobile { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18" fill="%2300bfff"/><path fill="%23fff" d="M28 32h8v8h-8z"/></svg>') center/contain no-repeat; }
+    .icon-station { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="18" width="28" height="28" fill="%23ffcc00"/><path fill="%23000" d="M24 24h16v16H24z"/></svg>') center/contain no-repeat; }
+    .custom-icon { width: 28px; height: 28px; }
   </style>
 </head>
 <body>
@@ -147,8 +145,6 @@ let personnelExpanded = false;
 
 /* DOM */
 const stationSelect = document.getElementById("stationFilter");
-const shiftSelect = document.getElementById("shiftFilter");
-const typeSelect = document.getElementById("typeFilter");
 const personnelTbody = document.querySelector("#personnelTable tbody");
 const crimeTbody = document.querySelector("#crimeTable tbody");
 const loadingOverlay = document.getElementById("loadingOverlay");
@@ -156,13 +152,22 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== MAP + CLUSTER =========================== */
+/* =========================== MAP + CLUSTER + ICONS =========================== */
 const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
+markerCluster = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  iconCreateFunction: function(cluster) {
+    return L.divIcon({
+      html: `<div style="background:#00bfff;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${cluster.getChildCount()}</div>`,
+      className: 'custom-cluster',
+      iconSize: [36, 36]
+    });
+  }
+});
 map.addLayer(markerCluster);
 
-/* =========================== FIELD & LAT/LNG =========================== */
+/* =========================== FIELD & ICONS =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
   const rowLower = {};
@@ -188,23 +193,34 @@ function parseLatLngFromRow(r) {
 }
 
 function getIcon(type) {
-  const icons = { "Patrol": "icon-patrol", "Checkpoint": "icon-checkpoint", "Mobile Patrol": "icon-mobile", "Station": "icon-station" };
+  const icons = { 
+    "Patrol": "icon-patrol", 
+    "Checkpoint": "icon-checkpoint", 
+    "Mobile Patrol": "icon-mobile", 
+    "Station": "icon-station",
+    "": "icon-patrol"
+  };
   const cls = icons[type] || "icon-patrol";
-  return L.divIcon({ className: "custom-icon", html: `<div class="${cls}"></div>`, iconSize: [28, 28], iconAnchor: [14, 28] });
+  return L.divIcon({ 
+    className: "custom-icon", 
+    html: `<div class="${cls}"></div>`, 
+    iconSize: [28, 28], 
+    iconAnchor: [14, 28] 
+  });
 }
 
-/* =========================== CACHE + LOAD =========================== */
+/* =========================== DATA + CACHE =========================== */
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
 async function loadData() {
   showLoading(true);
   try {
-    const cacheKey = 'nids_data_v1';
+    const cacheKey = 'nids_data_v2';
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const { data, crime, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 5 * 60 * 1000) { // 5 min cache
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
         allData = data; crimeData = crime;
         refreshUI(); applyFilters();
         showLoading(false);
@@ -225,15 +241,18 @@ async function loadData() {
       if (!coords) return null;
       const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
       const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
-      const type = getField(r, "Types Deployment", "Deployment Type");
+      const type = getField(r, "Types Deployment", "Deployment Type") || "";
       return {
         Station: getField(r, "Station/Unit", "Station") || "Unknown",
         Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
-        "Deployment Type": type || "Unspecified",
+        "Deployment Type": type,
         CallSign: getField(r, "Call Sign", "Call Sign:") || "",
         Location: getField(r, "Deployment Area", "Location") || "",
         Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture")),
-        PersonnelList: personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" })),
+        PersonnelList: personnel.map((n, i) => ({ 
+          name: n, 
+          mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" 
+        })),
         Lat: coords.lat, Lng: coords.lng,
         Icon: getIcon(type)
       };
@@ -242,13 +261,13 @@ async function loadData() {
     crimeData = crime.map(r => ({
       Station: getField(r, "Station") || "Unknown",
       "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
-      Barangay: getField(r, "Barangay") || ""
+      Barangay: getField(r, "Barangay") || "Unknown"
     }));
 
     localStorage.setItem(cacheKey, JSON.stringify({ data: allData, crime: crimeData, timestamp: Date.now() }));
     refreshUI(); applyFilters();
   } catch (e) {
-    summaryBox.innerHTML = "Offline mode: Using cached data.";
+    summaryBox.innerHTML = "Using cached data.";
     console.error(e);
   } finally {
     showLoading(false);
@@ -301,15 +320,21 @@ function applyFilters() {
   });
 
   if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+  else map.setView([9.3, 123.2], 10);
+
   renderPersonnelTable(filtered);
   renderCrimeTable(station);
   updateSummaryBox(filtered, station);
 }
 
-/* =========================== TABLES =========================== */
+/* =========================== PERSONNEL TABLE – LOADS INSTANTLY =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
-  const rows = data.flatMap(d => d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })));
+  const rows = data.flatMap(d => 
+    d.PersonnelList.length > 0 
+      ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign }))
+      : [{ name: "No personnel", mobile: "", Station: d.Station, CallSign: d.CallSign }]
+  );
   const visible = personnelExpanded ? rows : rows.slice(0, 5);
   visible.forEach(p => {
     const tr = document.createElement("tr");
@@ -321,14 +346,23 @@ function renderPersonnelTable(data) {
   toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${rows.length})`;
 }
 
+/* =========================== 8 FOCUS CRIMES – SUMMARY OR PER STATION =========================== */
 function renderCrimeTable(station) {
   crimeTbody.innerHTML = "";
   const crimes = station === "All" ? crimeData : crimeData.filter(c => c.Station === station);
   const counts = {};
-  crimes.forEach(c => { counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; });
-  ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(crime => {
+  crimes.forEach(c => { 
+    counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; 
+  });
+
+  const focusCrimes = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
+  focusCrimes.forEach(crime => {
+    const count = counts[crime] || 0;
+    const barangays = [...new Set(crimes.filter(c => c["Focus Crimes"] === crime).map(c => c.Barangay))];
+    const brgyText = station === "All" ? "All" : (barangays.length > 0 ? barangays.join(", ") : "None");
+
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${crime}</td><td>All</td><td><center>${counts[crime] || 0}</center></td>`;
+    tr.innerHTML = `<td>${crime}</td><td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${brgyText}">${brgyText}</td><td><center>${count}</center></td>`;
     crimeTbody.appendChild(tr);
   });
 }
@@ -375,7 +409,7 @@ document.getElementById("loginBtn").onclick = () => {
     document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
     if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
     setTimeout(() => {
-      map.invalidateSize(); // FIX MAP
+      map.invalidateSize();
       initApp();
     }, 100);
   } else alert("Invalid credentials");
@@ -408,7 +442,7 @@ function initApp() {
   loadData();
 
   stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
-  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v1'); loadData(); };
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v2'); loadData(); };
 }
 </script>
 </body>
