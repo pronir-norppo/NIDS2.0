@@ -22,43 +22,35 @@
     .sidebar{width:28%;background:var(--panel);padding:16px;overflow-y:auto;}
     h1{font-size:16px;color:var(--gold);margin-bottom:12px;}
     label{font-size:13px;color:#ddd;margin:10px 0 6px;display:block;}
-    select,button{width:100%;padding:8px;border-radius:6px;margin-bottom:8px;background:#2b2b2b;border:1px solid #333;color:#fff;}
+    select,button{width:100%;padding:10px;border-radius:6px;margin-bottom:10px;background:#2b2b2b;border:1px solid #333;color:#fff;font-size:14px;}
     button{background:var(--accent);border:none;cursor:pointer;}
-    table{width:100%;border-collapse:collapse;font-size:12px;}
-    th,td{padding:6px;border:1px solid #333;}
-    th{background:#2a2a2a;color:var(--gold);}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th,td{padding:8px 6px;border:1px solid #444;text-align:left;vertical-align:top;}
+    th{background:#2a2a2a;color:var(--gold);font-weight:bold;}
     .main{flex:1;position:relative;}
     #map{width:100%;height:100%;}
     #summaryBox{
       position:absolute; bottom:12px; left:12px; background:#000; color:yellow; 
-      padding:6px; border-radius:4px; font-size:11px; font-weight:500; 
-      z-index:1000; max-width:300px; max-height:180px; overflow:auto;
+      padding:8px; border-radius:6px; font-size:12px; font-weight:500; 
+      z-index:1000; max-width:320px; max-height:180px; overflow:auto;
     }
     #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
     #loadingOverlay.active{opacity:1;pointer-events:all;}
     .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .table-container{max-height:120px;overflow:hidden;transition:max-height .3s;}
-    .table-container.expanded{max-height:400px;overflow-y:auto;}
-    .toggle-link{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px;display:block;}
+    .table-container{max-height:180px;overflow-y:auto;margin-bottom:8px;}
+    .toggle-link{color:var(--accent);font-size:13px;cursor:pointer;margin-top:4px;display:block;}
     #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
-    .login-box{background:#1f1f1f;padding:24px;border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
-    .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;}
-    .login-box input{width:100%;padding:10px;margin:8px 0;border-radius:6px;background:#2b2b2b;border:1px solid #444;color:#fff;}
-    .login-box button{width:100%;margin-top:16px;}
-    #rememberMe{margin:8px 0;font-size:12px;color:#ddd;display:flex;align-items:center;}
+    .login-box{background:#1f1f1f;padding:28px;border-radius:12px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
+    .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;font-size:18px;}
+    .login-box input{width:100%;padding:12px;margin:8px 0;border-radius:6px;background:#2b2b2b;border:1px solid #444;color:#fff;font-size:15px;}
+    .login-box button{width:100%;margin-top:16px;padding:12px;font-size:15px;}
+    #rememberMe{margin:8px 0;font-size:13px;color:#ddd;display:flex;align-items:center;}
     #rememberMe input{width:auto;margin-right:8px;}
-    #logoutBtn{background:#ff4444;padding:4px 8px;font-size:11px;margin-left:8px;float:right;}
+    #logoutBtn{background:#ff4444;padding:6px 10px;font-size:12px;margin-left:8px;float:right;border-radius:4px;}
     .export-btns{display:flex;gap:8px;margin-top:12px;}
-    .export-btns button{flex:1;font-size:11px;}
-    #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
-
-    /* ICONS – RESTORED & COMPATIBLE WITH CLUSTER */
-    .icon-patrol { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="%2300bfff" d="M32 8L12 24v16l20 16 20-16V24L32 8z"/></svg>') center/contain no-repeat; }
-    .icon-checkpoint { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="%23ff4444"/><path fill="%23fff" d="M20 32l8 8 16-16"/></svg>') center/contain no-repeat; }
-    .icon-mobile { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18" fill="%2300bfff"/><path fill="%23fff" d="M28 32h8v8h-8z"/></svg>') center/contain no-repeat; }
-    .icon-station { background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="18" width="28" height="28" fill="%23ffcc00"/><path fill="%23000" d="M24 24h16v16H24z"/></svg>') center/contain no-repeat; }
-    .custom-icon { width: 28px; height: 28px; }
+    .export-btns button{flex:1;font-size:12px;padding:10px;}
+    #stationOnly{display:none;margin:16px 0;padding:12px;background:#2a2a2a;border-radius:6px;text-align:center;font-size:14px;}
   </style>
 </head>
 <body>
@@ -73,7 +65,8 @@
     <div style="margin-top:10px;font-size:11px;color:#aaa;">
       <b>Demo:</b><br>
       <code>admin / admin123</code><br>
-      <code>sibulan / sibulan123</code>
+      <code>sibulan / sibulan123</code><br>
+      <code>dumaguete / dgte123</code>
     </div>
   </div>
 </div>
@@ -130,6 +123,16 @@
 <div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
+/* =========================== ICONS (FIXED PNG URLs) =========================== */
+const ICONS = {
+  "Beat Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
+};
+
 /* =========================== USERS =========================== */
 const USERS = {
   "admin": { pass: "admin123", role: "admin" },
@@ -145,6 +148,8 @@ let personnelExpanded = false;
 
 /* DOM */
 const stationSelect = document.getElementById("stationFilter");
+const shiftSelect = document.getElementById("shiftFilter");
+const typeSelect = document.getElementById("typeFilter");
 const personnelTbody = document.querySelector("#personnelTable tbody");
 const crimeTbody = document.querySelector("#crimeTable tbody");
 const loadingOverlay = document.getElementById("loadingOverlay");
@@ -152,33 +157,19 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== MAP + CLUSTER + ICONS =========================== */
+/* =========================== MAP =========================== */
 const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-markerCluster = L.markerClusterGroup({
-  maxClusterRadius: 50,
-  iconCreateFunction: function(cluster) {
-    return L.divIcon({
-      html: `<div style="background:#00bfff;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${cluster.getChildCount()}</div>`,
-      className: 'custom-cluster',
-      iconSize: [36, 36]
-    });
-  }
-});
+markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
 map.addLayer(markerCluster);
 
-/* =========================== FIELD & ICONS =========================== */
+/* =========================== PARSERS (ROBUST) =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
-  const rowLower = {};
-  for (const key in row) {
-    const clean = key.toLowerCase().replace(/[:\.\s].*/g, '');
-    rowLower[clean] = row[key];
-  }
   for (const key of keys) {
-    const cleanKey = key.toLowerCase().replace(/[:\.\s].*/g, '');
-    if (rowLower[cleanKey] !== undefined && String(rowLower[cleanKey]).trim()) {
-      return rowLower[cleanKey];
+    const val = row[key];
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      return String(val).trim();
     }
   }
   return "";
@@ -187,36 +178,33 @@ function getField(row, ...keys) {
 function parseLatLngFromRow(r) {
   const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
   if (!latField) return null;
-  const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
+  const cleaned = latField.replace(/\s/g, '');
+  const match = cleaned.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
   if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
   return null;
 }
 
-function getIcon(type) {
-  const icons = { 
-    "Patrol": "icon-patrol", 
-    "Checkpoint": "icon-checkpoint", 
-    "Mobile Patrol": "icon-mobile", 
-    "Station": "icon-station",
-    "": "icon-patrol"
-  };
-  const cls = icons[type] || "icon-patrol";
-  return L.divIcon({ 
-    className: "custom-icon", 
-    html: `<div class="${cls}"></div>`, 
-    iconSize: [28, 28], 
-    iconAnchor: [14, 28] 
-  });
+function matchesStation(sheetName, userStation) {
+  if (!sheetName || !userStation) return false;
+  const clean = str => str.toLowerCase().replace(/[^\w]/g, '');
+  const s1 = clean(sheetName);
+  const s2 = clean(userStation);
+  return s1.includes(s2) || s2.includes(s1);
 }
 
-/* =========================== DATA + CACHE =========================== */
+function getIcon(type) {
+  const key = type.trim();
+  return ICONS[key] || ICONS["default"];
+}
+
+/* =========================== DATA LOAD =========================== */
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
 async function loadData() {
   showLoading(true);
   try {
-    const cacheKey = 'nids_data_v2';
+    const cacheKey = 'nids_data_v6';
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const { data, crime, timestamp } = JSON.parse(cached);
@@ -241,9 +229,10 @@ async function loadData() {
       if (!coords) return null;
       const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
       const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
-      const type = getField(r, "Types Deployment", "Deployment Type") || "";
+      const type = getField(r, "Types Deployment", "Deployment Type") || "default";
+      const station = getField(r, "Station/Unit", "Station") || "Unknown";
       return {
-        Station: getField(r, "Station/Unit", "Station") || "Unknown",
+        Station: station,
         Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
         "Deployment Type": type,
         CallSign: getField(r, "Call Sign", "Call Sign:") || "",
@@ -277,27 +266,39 @@ async function loadData() {
 function getImageUrl(url) {
   if (!url) return "";
   const match = url.match(/id=([^&]+)/);
-  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : url;
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : "";
 }
 
 function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
-/* =========================== FILTERS & MARKERS =========================== */
+/* =========================== UI POPULATE =========================== */
 function refreshUI() {
+  // Stations
   const stations = [...new Set(allData.map(d => d.Station))].sort();
   stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
+
+  // Shifts
+  const shifts = [...new Set(allData.map(d => d.Shift))].sort();
+  shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s => `<option>${s}</option>`).join("");
+
+  // Types
+  const types = [...new Set(allData.map(d => d["Deployment Type"]))].sort();
+  typeSelect.innerHTML = "<option value='All'>All</option>" + types.map(t => `<option>${t}</option>`).join("");
+
   markerCluster.clearLayers();
 }
 
+/* =========================== FILTERS =========================== */
 function applyFilters() {
   const isStation = currentUser.role === "station";
-  const station = isStation ? currentUser.station : selectedStation;
+  const stationFilter = isStation ? currentUser.station : selectedStation;
 
-  const filtered = allData.filter(d =>
-    (station === "All" || d.Station === station) &&
-    (selectedShift === "All" || d.Shift === selectedShift) &&
-    (selectedType === "All" || d["Deployment Type"] === selectedType)
-  );
+  const filtered = allData.filter(d => {
+    const stationMatch = stationFilter === "All" || matchesStation(d.Station, stationFilter);
+    const shiftMatch = selectedShift === "All" || d.Shift === selectedShift;
+    const typeMatch = selectedType === "All" || d["Deployment Type"] === selectedType;
+    return stationMatch && shiftMatch && typeMatch;
+  });
 
   markerCluster.clearLayers();
   const bounds = [];
@@ -305,14 +306,14 @@ function applyFilters() {
   filtered.forEach(r => {
     const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon });
     const popup = `
-      <div style="max-width:280px;font-size:12px;">
-        <h3 style="margin:0 0 4px;background:rgba(255,204,0,0.15);padding:2px;color:#000;font-size:13px;">${r.Station}</h3>
+      <div style="max-width:280px;font-size:13px;">
+        <h3 style="margin:0 0 4px;background:rgba(255,204,0,0.15);padding:4px;color:#000;font-size:14px;">${r.Station}</h3>
         <b>Area:</b> ${r.Location}<br>
         <b>Shift:</b> ${r.Shift}<br>
         <b>Type:</b> ${r["Deployment Type"]}<br>
         <b>Callsign:</b> ${r.CallSign}<br>
-        ${r.PersonnelList.map(p => `<div style="margin:3px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
-        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:4px;border-radius:4px;" loading="lazy">` : ''}
+        ${r.PersonnelList.map(p => `<div style="margin:4px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
+        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:6px;border-radius:4px;" loading="lazy">` : ''}
       </div>`;
     marker.bindPopup(popup, { maxWidth: 300 });
     markerCluster.addLayer(marker);
@@ -323,11 +324,11 @@ function applyFilters() {
   else map.setView([9.3, 123.2], 10);
 
   renderPersonnelTable(filtered);
-  renderCrimeTable(station);
-  updateSummaryBox(filtered, station);
+  renderCrimeTable(isStation ? currentUser.station : stationFilter);
+  updateSummaryBox(filtered, isStation ? currentUser.station : stationFilter);
 }
 
-/* =========================== PERSONNEL TABLE – LOADS INSTANTLY =========================== */
+/* =========================== TABLES (READABLE) =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
   const rows = data.flatMap(d => 
@@ -335,25 +336,25 @@ function renderPersonnelTable(data) {
       ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign }))
       : [{ name: "No personnel", mobile: "", Station: d.Station, CallSign: d.CallSign }]
   );
-  const visible = personnelExpanded ? rows : rows.slice(0, 5);
+  const visible = personnelExpanded ? rows : rows.slice(0, 8);
   visible.forEach(p => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${p.name}</td><td>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</td><td>${p.CallSign}</td><td>${p.Station}</td>`;
+    tr.innerHTML = `<td style="font-size:13px;">${p.name}</td>
+                    <td style="font-size:12px;">${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</td>
+                    <td style="font-size:12px;">${p.CallSign}</td>
+                    <td style="font-size:11px;">${p.Station}</td>`;
     personnelTbody.appendChild(tr);
   });
-  toggleLink.style.display = rows.length > 5 ? "inline-block" : "none";
+  toggleLink.style.display = rows.length > 8 ? "inline-block" : "none";
   toggleLink.onclick = () => { personnelExpanded = !personnelExpanded; applyFilters(); };
   toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${rows.length})`;
 }
 
-/* =========================== 8 FOCUS CRIMES – SUMMARY OR PER STATION =========================== */
 function renderCrimeTable(station) {
   crimeTbody.innerHTML = "";
-  const crimes = station === "All" ? crimeData : crimeData.filter(c => c.Station === station);
+  const crimes = station === "All" ? crimeData : crimeData.filter(c => matchesStation(c.Station, station));
   const counts = {};
-  crimes.forEach(c => { 
-    counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; 
-  });
+  crimes.forEach(c => { counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; });
 
   const focusCrimes = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
   focusCrimes.forEach(crime => {
@@ -362,14 +363,16 @@ function renderCrimeTable(station) {
     const brgyText = station === "All" ? "All" : (barangays.length > 0 ? barangays.join(", ") : "None");
 
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${crime}</td><td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${brgyText}">${brgyText}</td><td><center>${count}</center></td>`;
+    tr.innerHTML = `<td style="font-size:13px;">${crime}</td>
+                    <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${brgyText}">${brgyText}</td>
+                    <td style="text-align:center;font-weight:bold;">${count}</td>`;
     crimeTbody.appendChild(tr);
   });
 }
 
 function updateSummaryBox(data, station) {
   const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
-  summaryBox.innerHTML = `<b>${station}</b><br>Personnel: ${total}<br>Shift: ${selectedShift}`;
+  summaryBox.innerHTML = `<b style="font-size:14px;">${station}</b><br>Personnel: <b>${total}</b><br>Shift: <b>${selectedShift}</b>`;
 }
 
 /* =========================== EXPORT =========================== */
@@ -442,7 +445,9 @@ function initApp() {
   loadData();
 
   stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
-  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v2'); loadData(); };
+  shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
+  typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v6'); loadData(); };
 }
 </script>
 </body>
