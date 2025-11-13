@@ -124,7 +124,7 @@
 <div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-/* =========================== YOUR EXACT ICONS =========================== */
+/* =========================== ICONS =========================== */
 const ICONS = {
   "Foot Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
@@ -156,68 +156,59 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== MAP + CLUSTER =========================== */
+/* =========================== MAP =========================== */
 const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-markerCluster = L.markerClusterGroup({
-  maxClusterRadius: 50,
-  iconCreateFunction: function(cluster) {
-    return L.divIcon({
-      html: `<div style="background:#00bfff;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${cluster.getChildCount()}</div>`,
-      className: 'custom-cluster',
-      iconSize: [36, 36]
-    });
-  }
-});
+markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
 map.addLayer(markerCluster);
 
-/* =========================== FUZZY STATION MATCH =========================== */
-function matchesStation(sheetName, userStation) {
-  if (!sheetName || !userStation) return false;
-  const clean = str => str.toLowerCase().replace(/[^\w]/g, '').trim();
-  const s1 = clean(sheetName);
-  const s2 = clean(userStation);
-  return s1 === s2 || s1.includes(s2) || s2.includes(s1);
-}
-
-/* =========================== FIELD & ICONS =========================== */
+/* =========================== FIELD PARSER (ROBUST) =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
-  const rowLower = {};
-  for (const key in row) {
-    const clean = key.toLowerCase().replace(/[:\.\s].*/g, '');
-    rowLower[clean] = row[key];
-  }
   for (const key of keys) {
-    const cleanKey = key.toLowerCase().replace(/[:\.\s].*/g, '');
-    if (rowLower[cleanKey] !== undefined && String(rowLower[cleanKey]).trim()) {
-      return rowLower[cleanKey];
+    const val = row[key];
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      return String(val).trim();
     }
   }
   return "";
 }
 
+/* =========================== LAT/LNG PARSER (FLEXIBLE) =========================== */
 function parseLatLngFromRow(r) {
   const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
   if (!latField) return null;
-  const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
-  if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  const cleaned = latField.replace(/\s/g, ''); // Remove all spaces
+  const match = cleaned.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
+  if (match) {
+    return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  }
   return null;
 }
 
+/* =========================== STATION MATCH (FUZZY) =========================== */
+function matchesStation(sheetName, userStation) {
+  if (!sheetName || !userStation) return false;
+  const clean = str => str.toLowerCase().replace(/[^\w]/g, '');
+  const s1 = clean(sheetName);
+  const s2 = clean(userStation);
+  return s1.includes(s2) || s2.includes(s1);
+}
+
+/* =========================== ICON =========================== */
 function getIcon(type) {
   const key = type.trim();
   return ICONS[key] || ICONS["default"];
 }
 
-/* =========================== DATA + CACHE =========================== */
+/* =========================== DATA LOAD =========================== */
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
 async function loadData() {
   showLoading(true);
   try {
-    const cacheKey = 'nids_data_v4';
+    const cacheKey = 'nids_data_v5';
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const { data, crime, timestamp } = JSON.parse(cached);
@@ -279,12 +270,12 @@ async function loadData() {
 function getImageUrl(url) {
   if (!url) return "";
   const match = url.match(/id=([^&]+)/);
-  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : url;
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : "";
 }
 
 function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
-/* =========================== FILTERS & MARKERS (WITH FUZZY MATCH) =========================== */
+/* =========================== FILTERS =========================== */
 function refreshUI() {
   const stations = [...new Set(allData.map(d => d.Station))].sort();
   stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
@@ -330,7 +321,7 @@ function applyFilters() {
   updateSummaryBox(filtered, isStation ? currentUser.station : stationFilter);
 }
 
-/* =========================== TABLES & SUMMARY =========================== */
+/* =========================== TABLES =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
   const rows = data.flatMap(d => 
@@ -373,13 +364,59 @@ function updateSummaryBox(data, station) {
 }
 
 /* =========================== EXPORT =========================== */
-function exportToExcel() { /* same as before */ }
-async function exportToPDF() { /* same as before */ }
+function exportToExcel() {
+  if (currentUser.role !== "admin") return;
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(allData.map(d => ({
+    Station: d.Station, Shift: d.Shift, Type: d["Deployment Type"],
+    Personnel: d.PersonnelList.map(p => p.name).join(", "),
+    Contact: d.PersonnelList[0]?.mobile || ""
+  })));
+  XLSX.utils.book_append_sheet(wb, ws, "Deployments");
+  XLSX.writeFile(wb, "NIDS_Export.xlsx");
+}
+
+async function exportToPDF() {
+  if (currentUser.role !== "admin") return;
+  const canvas = await html2canvas(document.getElementById('map'), { scale: 1.5 });
+  const img = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l', 'mm', 'a4');
+  pdf.addImage(img, 'PNG', 10, 10, 270, 180);
+  pdf.text("NIDS Report", 10, 200);
+  pdf.save("NIDS_Report.pdf");
+}
 
 /* =========================== LOGIN & INIT =========================== */
-document.getElementById("loginBtn").onclick = () => { /* same as before */ };
+document.getElementById("loginBtn").onclick = () => {
+  const u = document.getElementById("username").value.trim().toLowerCase();
+  const p = document.getElementById("password").value;
+  const chk = document.getElementById("rememberMeChk").checked;
+  if (USERS[u] && USERS[u].pass === p) {
+    currentUser = USERS[u];
+    document.getElementById("loginModal").remove();
+    document.querySelector(".app").style.display = "flex";
+    document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
+    setTimeout(() => {
+      map.invalidateSize();
+      initApp();
+    }, 100);
+  } else alert("Invalid credentials");
+};
 
-if (localStorage.getItem('nids_user')) { /* same as before */ }
+if (localStorage.getItem('nids_user')) {
+  currentUser = JSON.parse(localStorage.getItem('nids_user'));
+  document.querySelector(".app").style.display = "flex";
+  document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+  document.getElementById("loginModal").remove();
+  setTimeout(() => {
+    map.invalidateSize();
+    initApp();
+  }, 100);
+}
 
 function initApp() {
   if (currentUser.role === "admin") {
@@ -396,7 +433,7 @@ function initApp() {
   loadData();
 
   stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
-  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v4'); loadData(); };
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v5'); loadData(); };
 }
 </script>
 </body>
