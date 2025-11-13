@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <title>NIDS v2.0</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -123,15 +123,21 @@
 <div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-/* =========================== ICONS (FIXED PNG URLs) =========================== */
+/* =========================== ICONS (PRE-LOAD + FALLBACK) =========================== */
 const ICONS = {
-  "Beat Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Foot/Beat": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
 };
+
+/* Preload icons */
+Object.values(ICONS).forEach(icon => {
+  const img = new Image();
+  img.src = icon.options.iconUrl;
+});
 
 /* =========================== USERS =========================== */
 const USERS = {
@@ -163,27 +169,30 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
 map.addLayer(markerCluster);
 
-/* =========================== PARSERS (ROBUST) =========================== */
+/* =========================== ROBUST FIELD PARSER =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
   for (const key of keys) {
-    const val = row[key];
-    if (val !== undefined && val !== null && String(val).trim() !== "") {
-      return String(val).trim();
+    let val = row[key];
+    if (val !== undefined && val !== null) {
+      val = String(val).trim();
+      if (val !== "") return val;
     }
   }
   return "";
 }
 
+/* =========================== LAT/LNG PARSER (ANY FORMAT) =========================== */
 function parseLatLngFromRow(r) {
-  const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
+  const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat", "Lat Long");
   if (!latField) return null;
-  const cleaned = latField.replace(/\s/g, '');
-  const match = cleaned.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
-  if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  const cleaned = latField.replace(/[^\d.,-]/g, '');
+  const parts = cleaned.split(',').map(p => parseFloat(p.trim())).filter(n => !isNaN(n));
+  if (parts.length >= 2) return { lat: parts[0], lng: parts[1] };
   return null;
 }
 
+/* =========================== STATION MATCH =========================== */
 function matchesStation(sheetName, userStation) {
   if (!sheetName || !userStation) return false;
   const clean = str => str.toLowerCase().replace(/[^\w]/g, '');
@@ -192,9 +201,10 @@ function matchesStation(sheetName, userStation) {
   return s1.includes(s2) || s2.includes(s1);
 }
 
+/* =========================== ICON LOOKUP =========================== */
 function getIcon(type) {
-  const key = type.trim();
-  return ICONS[key] || ICONS["default"];
+  const cleanType = type.trim();
+  return ICONS[cleanType] || ICONS["default"];
 }
 
 /* =========================== DATA LOAD =========================== */
@@ -204,7 +214,7 @@ const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbv
 async function loadData() {
   showLoading(true);
   try {
-    const cacheKey = 'nids_data_v6';
+    const cacheKey = 'nids_data_final';
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const { data, crime, timestamp } = JSON.parse(cached);
@@ -221,26 +231,26 @@ async function loadData() {
       fetch(CRIME_SHEET_CSV).then(r => r.text())
     ]);
 
-    const dep = Papa.parse(depText, { header: true }).data;
-    const crime = Papa.parse(crimeText, { header: true }).data;
+    const dep = Papa.parse(depText, { header: true, skipEmptyLines: true }).data;
+    const crime = Papa.parse(crimeText, { header: true, skipEmptyLines: true }).data;
 
     allData = dep.map(r => {
       const coords = parseLatLngFromRow(r);
       if (!coords) return null;
-      const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
-      const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
-      const type = getField(r, "Types Deployment", "Deployment Type") || "default";
-      const station = getField(r, "Station/Unit", "Station") || "Unknown";
+      const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)", "Personnel List");
+      const personnel = personnelStr ? personnelStr.split(/[,;]/).map(p => p.trim()).filter(Boolean) : [];
+      const type = getField(r, "Types Deployment", "Deployment Type", "Type") || "default";
+      const station = getField(r, "Station/Unit", "Station", "Unit") || "Unknown";
       return {
         Station: station,
-        Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
+        Shift: getField(r, "Duty Shift", "Duty Shift:", "Shift") || "Unspecified",
         "Deployment Type": type,
         CallSign: getField(r, "Call Sign", "Call Sign:") || "",
-        Location: getField(r, "Deployment Area", "Location") || "",
-        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture")),
+        Location: getField(r, "Deployment Area", "Location", "Area") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture", "Photo")),
         PersonnelList: personnel.map((n, i) => ({ 
           name: n, 
-          mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" 
+          mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:", "Mobile") : "" 
         })),
         Lat: coords.lat, Lng: coords.lng,
         Icon: getIcon(type)
@@ -256,7 +266,7 @@ async function loadData() {
     localStorage.setItem(cacheKey, JSON.stringify({ data: allData, crime: crimeData, timestamp: Date.now() }));
     refreshUI(); applyFilters();
   } catch (e) {
-    summaryBox.innerHTML = "Using cached data.";
+    summaryBox.innerHTML = "Error loading data. Using cache.";
     console.error(e);
   } finally {
     showLoading(false);
@@ -273,15 +283,12 @@ function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
 /* =========================== UI POPULATE =========================== */
 function refreshUI() {
-  // Stations
   const stations = [...new Set(allData.map(d => d.Station))].sort();
   stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
 
-  // Shifts
   const shifts = [...new Set(allData.map(d => d.Shift))].sort();
   shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s => `<option>${s}</option>`).join("");
 
-  // Types
   const types = [...new Set(allData.map(d => d["Deployment Type"]))].sort();
   typeSelect.innerHTML = "<option value='All'>All</option>" + types.map(t => `<option>${t}</option>`).join("");
 
@@ -328,7 +335,7 @@ function applyFilters() {
   updateSummaryBox(filtered, isStation ? currentUser.station : stationFilter);
 }
 
-/* =========================== TABLES (READABLE) =========================== */
+/* =========================== TABLES =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
   const rows = data.flatMap(d => 
@@ -447,7 +454,7 @@ function initApp() {
   stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
   shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
   typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
-  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v6'); loadData(); };
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_final'); loadData(); };
 }
 </script>
 </body>
