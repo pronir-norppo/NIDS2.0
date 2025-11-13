@@ -3,242 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <title>NIDS v2.0</title>
-  <!-- Leaflet & PapaParse -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="author" content="PSSg Leong, RAC - PIDMU, NOrPPO, PRO NIR" />	
   <style>
-    :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
-    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
-    .app{display:flex;height:100vh}
-    .sidebar {width: 28%; padding: 16px; background: var(--panel); box-sizing: border-box; overflow-y: auto; scrollbar-width: none;}
-    .sidebar::-webkit-scrollbar {display: none;}
-    h1{margin:0 0 10px 0;color:var(--gold);font-size:16px}
-    h2{margin:0 0 10px 0;color:var(--gold);font-size:12px}
-    label{display:block;font-size:13px;color:#ddd;margin:10px 0 6px}
-    select{width:100%;padding:8px;border-radius:6px;background:#2b2b2b;border:1px solid #333;color:#fff}
-    button{margin-top:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
-    th{background:#2a2a2a;color:var(--gold);text-align:left}
-    .crime-row{cursor:default}
-    .crime-row.muted{opacity:0.35; pointer-events: none;}
-    .person-row{cursor:pointer}
-    .person-row.muted{opacity:0.45}
-    .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
-    #personnelTable td, #personnelTable th{font-size:11px;}
-    #crimeTable td, #personnelTable th{font-size:11px;}
-    .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
-    #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
-    #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.6); z-index:9999;pointer-events:none;opacity:0;transition:opacity .28s;}
-    #loadingOverlay.active{pointer-events:all;opacity:1}
-    .spinner{width:48px;height:48px;border-radius:50%;border:6px solid #222;border-top-color:var(--gold);animation:spin 1s linear infinite}
+    :root{--bg:#121212; --panel:#1f1f1f; --accent:#00bfff; --gold:#ffcc00;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body,#map,.main,.app{height:100vh;width:100vw;overflow:hidden;}
+    body{background:var(--bg);color:#eee;font-family:Arial,sans-serif;display:flex;}
+    .app{flex:1;display:flex;height:100vh;}
+    .sidebar{width:28%;background:var(--panel);padding:16px;overflow-y:auto;}
+    h1{font-size:16px;color:var(--gold);margin-bottom:12px;}
+    label{font-size:13px;color:#ddd;margin:10px 0 6px;display:block;}
+    select,button{width:100%;padding:8px;border-radius:6px;margin-bottom:8px;background:#2b2b2b;border:1px solid #333;color:#fff;}
+    button{background:var(--accent);border:none;cursor:pointer;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th,td{padding:6px;border:1px solid #333;}
+    th{background:#2a2a2a;color:var(--gold);}
+    .main{flex:1;position:relative;}
+    #map{width:100%;height:100%;}
+    #summaryBox{
+      position:absolute; bottom:12px; left:12px; background:#000; color:yellow; 
+      padding:6px; border-radius:4px; font-size:11px; font-weight:500; 
+      z-index:1000; max-width:300px; max-height:180px; overflow:auto;
+    }
+    #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
+    #loadingOverlay.active{opacity:1;pointer-events:all;}
+    .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
-    #summaryBox{ position:absolute; bottom:12px; left:12px; background:black; color:yellow; padding:6px; border-radius:4px; font-size:11px; font-weight:500; z-index:500; max-width:360px; max-height:260px; overflow:auto; opacity:0.95;}
-    #summaryBox table{border-collapse:collapse;}
-    #summaryBox td{padding:2px 6px; border:1px solid #555; font-size:11px;}
-    .leaflet-popup-content img {max-width:160px; max-height:160px; border-radius:6px; margin-top:6px; display:block !important; visibility:visible !important; opacity:1 !important;}
-    .table-container { max-height: 110px; overflow-y: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.3s ease; }
-    .table-container.expanded { max-height: 380px; overflow-y: auto; scrollbar-width: thin; }
-    .table-container.expanded::-webkit-scrollbar { width: 6px; }
-    .table-container.expanded::-webkit-scrollbar-track { background: #2a2a2a; }
-    .table-container.expanded::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
-    .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
-    a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
-    
-    /* POPUP: force block layout + wrapping for clearer lines */
-    .leaflet-popup-content { white-space: normal !important; word-break: break-word !important; }
-    .leaflet-popup-content-wrapper { max-width: 400px !important; }
-    .popup-personnel { font-size:13px; line-height:1.35; }
-    .popup-row { margin:4px 0; }
-
-    .popup-person { display:block; margin:6px 0; padding-bottom:4px; border-bottom:1px dashed rgba(0,0,0,0.12); }
-    .popup-person .person-name { display:block; font-weight:600; margin-bottom:2px; }
-    .popup-person .person-contact { display:block; margin-top:2px; }
-    .popup-person .person-contact a.viber-link { color: #00bfff; font-weight:700; text-decoration:none; margin-right:6px; }
-    .popup-person .person-contact a.call-link { margin-left:8px; text-decoration:none; }
-    .popup-photo { margin-top:8px; }
-    .popup-photo img { display:block !important; max-width:160px !important; max-height:160px !important; border-radius:6px; visibility:visible !important; opacity:1 !important; }
-
-    .popup-photo.loading::before {
-      content: 'Loading image...';
-      display: block;
-      text-align: center;
-      color: #fff;
-      font-size: 12px;
-      margin-bottom: 4px;
-    }
-    
-    /* Stylish popup card */
-    .leaflet-popup-content-wrapper.custom-popup {
-      background: #1f1f1f;
-      border-radius: 12px;
-      padding: 0;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.5);
-      color: #eee;
-      font-family: Inter, Arial, sans-serif;
-    }
-
-    .leaflet-popup-content.custom-popup {
-      margin: 0;
-      padding: 0;
-    }
-
-    .popup-card {
-      padding: 12px 14px;
-      max-width: 380px;
-    }
-
-    .popup-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .popup-header h3 {
-      margin: 0;
-      font-size: 15px;
-      color: #000000;
-      background: rgba(255,204,0,0.15);
-    }
-
-    .popup-callsign {
-      font-size: 12px;
-      background: rgba(255,204,0,0.15);
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
-
-    .popup-row {
-      font-size: 13px;
-      margin: 4px 0;
-    }
-
-    .popup-people {
-      margin-top: 6px;
-    }
-
-    .popup-person {
-      margin: 6px 0;
-      padding: 6px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 6px;
-    }
-
-    .popup-person .person-name {
-      font-weight: 600;
-      color: #9C2007;
-    }
-
-    .popup-photo {
-      margin-top: 10px;
-      text-align: center;
-    }
-
-    .popup-photo img {
-      max-width: 100% !important;
-      max-height: 160px !important;
-      display: block !important;
-      border-radius: 8px;
-      border: 1px solid #333;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-
-    /* Force popup images to show properly */
-    .leaflet-popup-content .popup-photo img {
-      max-width: 160px !important;
-      max-height: 160px !important;
-      display: block !important;
-      border-radius: 8px;
-      border: 1px solid #333;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
+    .table-container{max-height:120px;overflow:hidden;transition:max-height .3s;}
+    .table-container.expanded{max-height:400px;overflow-y:auto;}
+    .toggle-link{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px;display:block;}
+    #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
+    .login-box{background:#1f1f1f;padding:24px;border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
+    .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;}
+    .login-box input{width:100%;padding:10px;margin:8px 0;border-radius:6px;background:#2b2b2b;border:1px solid #444;color:#fff;}
+    .login-box button{width:100%;margin-top:16px;}
+    #rememberMe{margin:8px 0;font-size:12px;color:#ddd;display:flex;align-items:center;}
+    #rememberMe input{width:auto;margin-right:8px;}
+    #logoutBtn{background:#ff4444;padding:4px 8px;font-size:11px;margin-left:8px;float:right;}
+    .export-btns{display:flex;gap:8px;margin-top:12px;}
+    .export-btns button{flex:1;font-size:11px;}
+    #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- SIDEBAR: Filters, Personnel, Crimes -->
-    <div class="sidebar">
-      <h1>NIDS 2.0 &nbsp;&nbsp;<button id="refreshBtn">Refresh</button></h1>
 
-      <!-- Station / Shift / Type filters (chained) -->
-      <label for="stationFilter">Station</label>
+<div id="loginModal">
+  <div class="login-box">
+    <h2>NIDS Login</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <label id="rememberMe"><input type="checkbox" id="rememberMeChk" /> Remember Me</label>
+    <button id="loginBtn">Login</button>
+    <div style="margin-top:10px;font-size:11px;color:#aaa;">
+      <b>Demo:</b><br>
+      <code>admin / admin123</code><br>
+      <code>sibulan / sibulan123</code>
+    </div>
+  </div>
+</div>
+
+<div class="app" style="display:none">
+  <div class="sidebar">
+    <h1>NIDS 2.0 
+      <span id="userInfo" style="font-size:12px;color:#aaa;"></span>
+      <button id="refreshBtn">Refresh</button>
+      <button id="logoutBtn">Logout</button>
+    </h1>
+
+    <div id="adminControls" style="display:none;">
+      <label>Station</label>
       <select id="stationFilter"><option value="All">All</option></select>
-
-      <label for="shiftFilter">Shift</label>
-      <select id="shiftFilter" disabled><option value="All">All</option></select>
-
-      <label for="typeFilter">Deployment Type</label>
-      <select id="typeFilter" disabled><option value="All">All</option></select>
-
-      <!-- Personnel -->
-      <h2 style="margin-top:16px">Personnel</h2>
-      <div id="personnelContainer" class="table-container">
-        <!-- Table now shows one row per PERSON (Name / Mobile / CallSign / Station) -->
-        <table id="personnelTable">
-          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
-
-      <!-- Focus crimes (unclickable rows, greyed when zero) -->
-      <h2 style="margin-top:20px">8 Focus Crimes</h2>
-      <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
+      <label>Shift</label>
+      <select id="shiftFilter"><option value="All">All</option></select>
+      <label>Deployment Type</label>
+      <select id="typeFilter"><option value="All">All</option></select>
     </div>
 
-    <!-- MAIN: Map + Summary -->
-    <div class="main">
-      <div id="map">
-        <div id="summaryBox">Summary...</div>
-      </div>
+    <div id="stationOnly">
+      <strong id="lockedStation"></strong><br>
+      <small style="color:#aaa;">Current shift only</small>
+    </div>
+
+    <h2 style="margin-top:16px">Personnel</h2>
+    <div id="personnelContainer" class="table-container">
+      <table id="personnelTable">
+        <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
+
+    <h2 style="margin-top:20px">8 Focus Crimes</h2>
+    <table id="crimeTable">
+      <thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div id="exportButtons" class="export-btns" style="display:none;">
+      <button onclick="exportToExcel()">Export Excel</button>
+      <button onclick="exportToPDF()">Export PDF</button>
     </div>
   </div>
 
-  <!-- Loading overlay -->
-  <div id="loadingOverlay"><div class="spinner"></div></div>
+  <div class="main">
+    <div id="map"></div>
+    <div id="summaryBox">Loading...</div>
+  </div>
+</div>
+
+<div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-/* ===========================
-   CONFIG / CONSTANTS
-   ===========================
-*/
-const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
-const CRIME_SHEET_CSV      = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
-const PLACEHOLDER_IMG = "https://via.placeholder.com/160x90.png";
-
-// Robust Google Drive image parser → uses thumbnail API
-function getImageUrl(rawUrl){
-  if(!rawUrl) return PLACEHOLDER_IMG;
-  let url = String(rawUrl).trim();
-  try {
-    if(url.includes("open?id=")){
-      const id = new URL(url).searchParams.get("id");
-      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w420`;
-    }
-    if(url.includes("/file/d/")){
-      const match = url.match(/\/file\/d\/([^/]+)\//);
-      if(match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
-    }
-    if(url.startsWith("http")) return url;
-  } catch(e){
-    console.warn("[IMG PARSER] Failed:", rawUrl, e);
-  }
-  return PLACEHOLDER_IMG;
-}
-
-
-const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/160x90.png"; // Placeholder image
-const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD+SURBVFhH7ZZBCsJADEU7uA1BPYJ7sA+2F3EP7sHewb0o0klySBIyM7Mzs3P2T4L/5S8s2P3+MwAAbG9vby8AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAOzq6urqAABsb29vLwAA7O7u7u4AAADgfwMA2m4z3wAAAABJRU5ErkJggg=="; // Small 32x32 black square
-const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
-const defaultCenter = [9.3, 123.2];
-const defaultZoom = 9;
-const FALLBACK_COORDS = { lat: 9.3, lng: 123.2 }; // Fallback for invalid lat/lng
-
+/* =========================== YOUR EXACT ICONS =========================== */
 const ICONS = {
   "Foot/Beat": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Motorcycle": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
@@ -248,902 +133,307 @@ const ICONS = {
   "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
 };
 
-/* Fallback icon if primary icon fails */
-const FALLBACK_ICON = L.icon({ iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png", iconSize: [25, 41], iconAnchor: [12, 41] });
+/* =========================== USERS =========================== */
+const USERS = {
+  "admin": { pass: "admin123", role: "admin" },
+  "sibulan": { pass: "sibulan123", role: "station", station: "Sibulan PS" },
+  "dumaguete": { pass: "dgte123", role: "station", station: "Dumaguete CPS" }
+};
 
-/* ===========================
-   STATE & DOM REFERENCES
-   ===========================
-*/
-let allData = [];
-let crimeData = [];
-let displayedMarkers = [];
-let highlightLayer = null;
-let selectedRowEl = null;
+let currentUser = null;
+let allData = [], crimeData = [];
+let markerCluster = null;
+let selectedStation = "All", selectedShift = "All", selectedType = "All";
 let personnelExpanded = false;
-const imageCache = new Map(); // Cache for loaded images
 
+/* DOM */
 const stationSelect = document.getElementById("stationFilter");
-const shiftSelect   = document.getElementById("shiftFilter");
-const typeSelect    = document.getElementById("typeFilter");
-const crimeTbody    = document.querySelector("#crimeTable tbody");
-const personnelTbody= document.querySelector("#personnelTable tbody");
-const loadingOverlay= document.getElementById("loadingOverlay");
-const summaryBox    = document.getElementById("summaryBox");
-const toggleLink    = document.getElementById("togglePersonnel");
-const refreshBtn    = document.getElementById("refreshBtn");
+const personnelTbody = document.querySelector("#personnelTable tbody");
+const crimeTbody = document.querySelector("#crimeTable tbody");
+const loadingOverlay = document.getElementById("loadingOverlay");
+const summaryBox = document.getElementById("summaryBox");
+const toggleLink = document.getElementById("togglePersonnel");
+const refreshBtn = document.getElementById("refreshBtn");
 
-/* ===========================
-   MAP INITIALIZATION
-   ===========================
-*/
-const map = L.map('map').setView(defaultCenter, defaultZoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; PICTMU, NOrPPO, PRO NIR' }).addTo(map);
-
-/* Gold highlight style uses a circle marker */
-function addHighlight(latlng){
-  try {
-    // Only create a new highlight if latlng has changed or no highlight exists
-    if (
-      highlightLayer &&
-      highlightLayer.getLatLng &&
-      highlightLayer.getLatLng().lat === latlng[0] &&
-      highlightLayer.getLatLng().lng === latlng[1]
-    ) {
-      return; // No need to update if the position is the same
-    }
-    if (highlightLayer) {
-      map.removeLayer(highlightLayer);
-      highlightLayer = null;
-    }
-    highlightLayer = L.circleMarker(latlng, {
-      radius: 10,
-      color: '#b8860b',
-      weight: 3,
-      fillColor: '#ffcc00',
-      fillOpacity: 0.9,
-      opacity: 1,
-    }).addTo(map);
-  } catch(e) {
-    console.warn("[HIGHLIGHT] Error:", e);
+/* =========================== MAP + CLUSTER =========================== */
+const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+markerCluster = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  iconCreateFunction: function(cluster) {
+    return L.divIcon({
+      html: `<div style="background:#00bfff;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${cluster.getChildCount()}</div>`,
+      className: 'custom-cluster',
+      iconSize: [36, 36]
+    });
   }
-}
+});
+map.addLayer(markerCluster);
 
-/* ===========================
-   HELPERS
-   ===========================
-*/
-function normalize(s){ return s ? String(s).trim().toLowerCase() : ""; }
-function showLoading(on){ loadingOverlay.classList.toggle("active", !!on); }
-
-// Debounce function to limit event frequency
-function debounce(func, wait) {
-  let timeout;
-  return function (...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
-
-/* Helper: robustly find a field value in a CSV row using several heuristics:
-   - exact keys passed
-   - trimmed-key match
-   - case-insensitive trimmed match
-   - substring match (fallback)
-*/
+/* =========================== FIELD & ICONS =========================== */
 function getField(row, ...keys) {
-  if(!row) return "";
-  // 1) direct exact match
-  for (const k of keys) {
-    if (k in row && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+  if (!row) return "";
+  const rowLower = {};
+  for (const key in row) {
+    const clean = key.toLowerCase().replace(/[:\.\s].*/g, '');
+    rowLower[clean] = row[key];
   }
-  // 2) trimmed/normalized key exact match
-  const actualKeys = Object.keys(row);
-  for (const k of keys) {
-    const target = String(k || "").trim().toLowerCase();
-    for (const a of actualKeys) {
-      if (String(a).trim().toLowerCase() === target) {
-        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
-      }
-    }
-  }
-  // 3) substring fallback (if nothing found yet)
-  for (const a of actualKeys) {
-    const ak = String(a).toLowerCase();
-    for (const k of keys) {
-      if (ak.indexOf(String(k || "").trim().toLowerCase()) !== -1) {
-        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
-      }
+  for (const key of keys) {
+    const cleanKey = key.toLowerCase().replace(/[:\.\s].*/g, '');
+    if (rowLower[cleanKey] !== undefined && String(rowLower[cleanKey]).trim()) {
+      return rowLower[cleanKey];
     }
   }
   return "";
 }
 
-/* Robust lat/lng extraction - supports more edge cases */
-function parseLatLngFromRow(r){
-  try {
-    const tryVals = (keys) => {
-      for(const k of keys){
-        if(r[k] !== undefined && r[k] !== null && String(r[k]).trim()!=="") return String(r[k]).trim();
-      }
-      return "";
-    };
-
-    let combined = tryVals([
-  "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ",
-  "Latitude, Longitude",
-  "Lat_Long",
-  "Lat_Long (e.g. 9.33805856, 123.3007679)",
-  "Lat_Long (e.g. 9.33805856, 123.3007679",
-  "LatLong",
-  "Lat / Long",
-  "Lat_Long ",
-  "lat_long",
-  "latlong",
-  "Lat/Long",
-  "Latitude_Longitude",
-  "lat,lng",
-  "Coordinates",
-  "coords",
-  "Location"
-]);
-
-// fallback: use getField heuristics (handles trimmed keys / trailing spaces)
-if(!combined) combined = getField(r, "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ", "Latitude, Longitude", "Lat_Long (e.g. 9.33805856, 123.3007679)", "Lat_Long", "LatLong", "Coordinates", "coords", "Location");
-	
-	
-    let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
-    let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
-
-    if(combined){
-      // Handle various separators (comma, semicolon, slash, space, parentheses)
-      const parts = combined.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
-      if(parts.length >= 2){
-        const a = parseFloat(parts[0].replace(/[^\d\.\-]/g,'')), b = parseFloat(parts[1].replace(/[^\d\.\-]/g,''));
-        if(!isNaN(a) && !isNaN(b)) {
-          console.log("[PARSE LATLNG] Parsed combined:", combined, "Lat:", a, "Lng:", b);
-          return { lat: +a, lng: +b };
-        }
-      }
-    }
-
-    if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
-      const ps = latVal.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
-      if(ps.length>=2){
-        const a = parseFloat(ps[0]), b = parseFloat(ps[1]);
-        if(!isNaN(a) && !isNaN(b)) {
-          console.log("[PARSE LATLNG] Parsed lat comma:", latVal, "Lat:", a, "Lng:", b);
-          latVal = ps[0]; lngVal = ps[1];
-        }
-      }
-    }
-
-    let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
-    let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
-
-    function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
-    function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
-
-    if(!isNaN(lat) && !isNaN(lng)){
-      if(!inPHLat(lat) && inPHLat(lng) && !inPHLng(lng) && inPHLng(lat)){
-        const tmp = lat; lat = lng; lng = tmp;
-        console.log("[PARSE LATLNG] Swapped lat/lng:", lat, lng);
-      }
-    }
-
-    if(isNaN(lat) || isNaN(lng)){
-      console.warn("[PARSE LATLNG] Invalid lat/lng for row:", r, "LatVal:", latVal, "LngVal:", lngVal);
-      return FALLBACK_COORDS; // Use fallback coordinates
-    }
-
-    console.log("[PARSE LATLNG] Success:", { lat, lng });
-    return { lat: +lat, lng: +lng };
-  } catch(err) {
-    console.error("[PARSE LATLNG] Error for row:", r, err);
-    return FALLBACK_COORDS; // Use fallback coordinates
-  }
+function parseLatLngFromRow(r) {
+  const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
+  if (!latField) return null;
+  const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
+  if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  return null;
 }
 
-/* Small helper to escape HTML for popups */
-function escapeHtml(s){ return (s||"").toString().replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
-
-/* Helper to create a viber/tel anchor with visible number */
-function makeContactLinks(mobile){
-  const cleaned = (mobile||"").toString().replace(/\s+/g,'');
-  if(!cleaned) return '';
-  let plusNum = cleaned;
-  if(/^0\d+/.test(cleaned)) plusNum = "+63" + cleaned.slice(1);
-  if(/^\d{10,}$/.test(cleaned) && !/^\+/.test(plusNum)) plusNum = "+" + plusNum;
-  const vlink = `viber://chat?number=${encodeURIComponent(plusNum)}`;
-  const tel = `tel:${plusNum}`;
-  return `<a class="viber-link" href="${vlink}" title="Open Viber">${escapeHtml(plusNum)}</a> <a href="${tel}" title="Call"></a>`;
+function getIcon(type) {
+  const key = type.trim();
+  return ICONS[key] || ICONS["default"];
 }
 
-/* ===========================
-   CSV FETCH (with cache-busting)
-   ===========================
-*/
-function fetchCsv(url){
-  return fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {cache: "no-store"})
-    .then(r => {
-      if(!r.ok) throw new Error("Network response not ok: " + r.status);
-      return r.text();
-    })
-    .then(text => {
-      console.log("[FETCH CSV] Successfully fetched:", url);
-      return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
-    })
-    .catch(err => {
-      console.error("[FETCH CSV] Error fetching:", url, err);
-      throw err;
-    });
-}
+/* =========================== DATA + CACHE =========================== */
+const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
-/* ===========================
-   LOAD & NORMALIZE DATA
-   ===========================
-*/
-async function loadData(){
+async function loadData() {
   showLoading(true);
-  console.log("[LOAD] Starting fetch of CSVs...");
-  try{
-    console.log("[LOAD] Fetching CSVs...");
-    const [depRows, crimeRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV) ]);
-    console.log("[LOAD] CSVs fetched, raw deployments:", depRows.slice(0,3), "raw crimes:", crimeRows.slice(0,3));
-
-    // Preload fallback image only
-    console.log("[LOAD] Preloading fallback image:", FALLBACK_TEST_IMAGE);
-    const img = new Image();
-    img.src = FALLBACK_TEST_IMAGE;
-    img.onload = () => {
-      console.log("[PRELOAD] Loaded:", FALLBACK_TEST_IMAGE, "Time:", new Date().toISOString());
-      imageCache.set(FALLBACK_TEST_IMAGE, FALLBACK_TEST_IMAGE);
-    };
-    img.onerror = () => {
-      console.error("[PRELOAD] Failed:", FALLBACK_TEST_IMAGE, "Time:", new Date().toISOString());
-      imageCache.set(FALLBACK_TEST_IMAGE, STATIC_TEST_IMAGE);
-    };
-
-    allData = depRows.map((r, idx) => {
-      const { lat, lng } = parseLatLngFromRow(r);
-	  
-	console.log("Row keys:", Object.keys(r));
-// robust lookup for Personnel header variants (handles trailing spaces / header renames)
-const personnelFieldValue = getField(r,
-  "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ",
-  "Personnel (Rank_FName_MI_LName)",
-  "Personnel (Rank_FName_MI_LName (Contact#) ",
-  "Personnel (Rank_FName_MI_LName (Contact#)",
-  "Personnel",
-  "Personnel (Rank_FName_MI_LName (Contact#) "
-);
-console.log("Personnel field raw value (resolved):", personnelFieldValue);
-
-// ensure rawPersonnel is always an array (avoid calling .map on string)
-const personnelRaw = (personnelFieldValue || "").toString();
-// Parse into array of objects { name, mobile }
-const rawPersonnel = [];
-if (personnelRaw) {
-  personnelRaw.split(",")
-    .map(p=>p.trim())
-    .filter(Boolean)
-    .forEach(entry => {
-      rawPersonnel.push({ name: entry, mobile: "" });
-    });
-}
-
-// Assign contact to the first personnel (team leader)
-const contactFieldValue = getField(r,
-  "Contact Number: Note: Only the number of the team leader (or most senior member) is required. ",
-  "Contact Number",
-  "Mobile",
-  "Mobile No",
-  "Mobile#"
-);
-const contact = (contactFieldValue || "").toString().trim();
-if (contact && rawPersonnel.length > 0) {
-  rawPersonnel[0].mobile = contact;
-}
-
-      const rowData = {
-        raw: r,
-        Station: getField(r, "Station/Unit", "Station -", "Station") || "Unknown",
-        Shift: getField(r, "Duty Shift:", "Shift") || "Unspecified",
-        "Deployment Type": getField(r, "Types Deployment:", "Deployment Type", "DeploymentType") || "Unspecified",
-        Name: getField(r, "Name (Rank FName MI LName)", "Name") || (rawPersonnel.length > 0 ? rawPersonnel[0].name : "Unnamed"),
-        CallSign: getField(r, "Call Sign:", "Call Sign", "CallSign") || "",
-        Location: getField(r, "Deployment Area", "Location", "Location/Barangay") || "",
-        Photo: getImageUrl(getField(r, "Picture with Timestamp:", "Picture with timestamp", "Photo", "Picture")),
-        PersonnelList: rawPersonnel,
-        Lat: lat,
-        Lng: lng
-      };
-      console.log("[LOAD] Parsed deployment row:", rowData);
-      return rowData;
-    }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0); // Optional: filter invalid rows
-
-    crimeData = crimeRows.map(r => {
-      const rowData = {
-        Station: getField(r, "Station") || "Unknown",
-        "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
-        Barangay: getField(r, "Barangay") || ""
-      };
-      console.log("[LOAD] Parsed crime row:", rowData);
-      return rowData;
-    });
-
-    console.log("[LOAD] Parsed deployments count:", allData.length);
-    console.log("[LOAD] Parsed deployments sample:", allData.slice(0,6));
-    console.log("[LOAD] Parsed crimes count:", crimeData.length);
-    console.log("[LOAD] Parsed crimes sample:", crimeData.slice(0,6));
-    console.log("[LOAD] Validating data before refreshUI...");
-    if (!allData || !Array.isArray(allData)) {
-      throw new Error("allData is not an array: " + JSON.stringify(allData));
-    }
-    if (!crimeData || !Array.isArray(crimeData)) {
-      throw new Error("crimeData is not an array: " + JSON.stringify(crimeData));
-    }
-    console.log("[LOAD] Calling refreshUI...");
-    refreshUI();
-  } catch(err){
-    console.error("[LOAD] Error loading CSVs or parsing data:", err, "Stack:", err.stack);
-  } finally {
-    showLoading(false);
-    console.log("[LOAD] Completed");
-  }
-}
-
-/* ===========================
-   REFRESH UI
-   ===========================
-*/
-function refreshUI(){
   try {
-    console.log("[REFRESH UI] Starting...");
-    console.log("[REFRESH UI] allData:", allData.length, allData.slice(0,3));
-    const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-    console.log("[REFRESH UI] Stations:", stationSet);
-    stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-    console.log("[REFRESH UI] Station filter options:", stationSet);
-
-    shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
-    typeSelect.innerHTML  = "<option value='All'>All</option>"; typeSelect.disabled = true;
-
-    selectedStation = "All"; selectedShift = "All"; selectedType = "All";
-
-    displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){ console.warn("[REFRESH UI] Remove marker error:", e); } });
-    displayedMarkers = [];
-
-    console.log("[REFRESH UI] Calling applyFilters...");
-    applyFilters();
-    console.log("[REFRESH UI] Completed");
-  } catch(err) {
-    console.error("[REFRESH UI] Error:", err, "Stack:", err.stack);
-  }
-}
-
-/* ===========================
-   APPLY FILTERS
-   ===========================
-*/
-let selectedStation = "All", selectedShift = "All", selectedType = "All";
-function applyFilters(){
-  try {
-    showLoading(true);
-    console.log("[FILTER] Applying filters:", { selectedStation, selectedShift, selectedType });
-
-    const filtered = allData.filter(d =>
-      (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
-      (selectedShift === "All" || normalize(d.Shift) === normalize(selectedShift)) &&
-      (selectedType === "All" || normalize(d["Deployment Type"]) === normalize(selectedType))
-    );
-    console.log("[FILTER] Filtered deployments:", filtered.length, filtered.slice(0,3));
-
-    displayedMarkers.forEach(mset => {
-      try{ map.removeLayer(mset.marker); } catch(e){ console.warn("[FILTER] Remove marker error:", e); }
-    });
-    displayedMarkers = [];
-
-    const bounds = [];
-    filtered.forEach((r, idx) => {
-      const lat = r.Lat != null ? r.Lat : FALLBACK_COORDS.lat;
-      const lng = r.Lng != null ? r.Lng : FALLBACK_COORDS.lng;
-      console.log("[FILTER] Processing marker for:", r.Station, "Lat:", lat, "Lng:", lng, "Deployment Type:", r["Deployment Type"]);
-
-      const photoUrl = r.Photo || FALLBACK_TEST_IMAGE;
-      console.log("[POPUP IMG VALUE]", photoUrl, "Station:", r.Station);
-
-      const imgSrc = imageCache.get(photoUrl) || photoUrl;
-      console.log("[POPUP IMG SRC]", imgSrc, "Station:", r.Station);
-
-      // Create popup content as DOM elements
-      const popupDiv = document.createElement('div');
-      popupDiv.className = 'popup-card';
-      
-      const header = document.createElement('div');
-      header.className = 'popup-header';
-      const h3 = document.createElement('h3');
-      h3.textContent = r.Station || 'Unknown Unit';
-      header.appendChild(h3);
-      popupDiv.appendChild(header);
-
-      if (r.Location) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Patrol Area:</b> ${escapeHtml(r.Location)}`;
-        popupDiv.appendChild(row);
-      }
-      if (r.Shift) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Shift:</b> ${escapeHtml(r.Shift)}`;
-        popupDiv.appendChild(row);
-      }
-      if (r["Deployment Type"]) {
-        const row = document.createElement('div');
-        row.className = 'popup-row';
-        row.innerHTML = `<b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}`;
-        popupDiv.appendChild(row);
-      }
-      if (r.CallSign) {
-        const callsign = document.createElement('span');
-        callsign.className = 'popup-callsign';
-        callsign.innerHTML = `<b>Callsign</b>: ${escapeHtml(r.CallSign)}`;
-        popupDiv.appendChild(callsign);
-      }
-
-      const hr = document.createElement('hr');
-      popupDiv.appendChild(hr);
-
-      const peopleDiv = document.createElement('div');
-      peopleDiv.className = 'popup-people';
-      if (Array.isArray(r.PersonnelList) && r.PersonnelList.length) {
-        r.PersonnelList.forEach((p, idx) => {
-          const personDiv = document.createElement('div');
-          personDiv.className = 'popup-person';
-          const name = p.name || r.Name || ("Person " + (idx+1));
-          const mobile = p.mobile || "";
-          const nameSpan = document.createElement('span');
-          nameSpan.className = 'person-name';
-          nameSpan.textContent = name;
-          personDiv.appendChild(nameSpan);
-          personDiv.appendChild(document.createElement('br'));
-          personDiv.innerHTML += mobile ? makeContactLinks(mobile) : `<span style="opacity:0.6">no mobile</span>`;
-          peopleDiv.appendChild(personDiv);
-        });
-      } else {
-        const personDiv = document.createElement('div');
-        personDiv.className = 'popup-person';
-        personDiv.innerHTML = `<strong>${escapeHtml(r.Name || "Unnamed")}</strong>`;
-        peopleDiv.appendChild(personDiv);
-      }
-      popupDiv.appendChild(peopleDiv);
-
-      const photoDiv = document.createElement('div');
-      photoDiv.className = 'popup-photo loading';
-      const img = document.createElement('img');
-      img.src = imgSrc;
-      img.alt = 'photo';
-      img.width = 250;
-      img.height = 120;
-      img.onload = () => {
-        console.log('[IMG LOADED]', img.src, 'Complete:', img.complete, 'NaturalWidth:', img.naturalWidth, 'Station:', r.Station, 'Time:', new Date().toISOString());
-        photoDiv.classList.remove('loading');
-      };
-      img.onerror = (err) => {
-        console.error('[IMG ERROR]', img.src, 'Station:', r.Station, 'Error:', err, 'Time:', new Date().toISOString());
-        img.src = STATIC_TEST_IMAGE; // Fallback to black square
-        img.width = 250;
-        img.height = 120;
-        photoDiv.classList.remove('loading');
-      };
-      photoDiv.appendChild(img);
-      popupDiv.appendChild(photoDiv);
-
-      // Log popup HTML content
-      console.log("[POPUP HTML]", popupDiv.outerHTML, "Station:", r.Station);
-
-      const deploymentType = r["Deployment Type"] || "default";
-      let icon = ICONS[deploymentType] || ICONS["default"];
-      console.log("[MARKER] Creating marker for:", r.Station, "Icon:", deploymentType, "Icon URL:", icon.options.iconUrl);
-
-      // Test icon URL
-      const iconImg = new Image();
-      iconImg.src = icon.options.iconUrl;
-      iconImg.onload = () => {
-        console.log("[ICON] Loaded:", icon.options.iconUrl, "Station:", r.Station);
-      };
-      iconImg.onerror = () => {
-        console.error("[ICON] Failed:", icon.options.iconUrl, "Station:", r.Station);
-        icon = FALLBACK_ICON;
-      };
-
-      const marker = L.marker([lat, lng], { icon });
-      marker.bindPopup(popupDiv, {
-        maxWidth: 400,
-        minWidth: 250,
-        className: "custom-popup",
-        autoClose: false,
-        keepInView: true
-      });
-
-      // Store observer to disconnect on popup close
-      let popupObserver = null;
-
-      marker.on('popupopen', function() {
-        console.log("[POPUP OPEN] Marker:", r.Station, "Image URL:", img.src, "Lat:", lat, "Lng:", lng, "Time:", new Date().toISOString());
-        const popupContainer = document.querySelector('.leaflet-popup-content-wrapper');
-        if (popupContainer) {
-          console.log("[POPUP HTML ON OPEN]", popupContainer.outerHTML, "Station:", r.Station);
-          popupObserver = new MutationObserver((mutations) => {
-            mutations.forEach(m => {
-              console.log("[POPUP MUTATION] Type:", m.type, "Target:", m.target.nodeName, "Attribute:", m.attributeName || 'N/A', "Station:", r.Station, "Time:", new Date().toISOString());
-              if (m.type === 'attributes' && m.target.nodeName === 'IMG' && m.attributeName === 'src') {
-                console.log("[POPUP MUTATION] Image src changed to:", m.target.src, "Station:", r.Station);
-              }
-            });
-          });
-          popupObserver.observe(popupContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
-          console.log("[POPUP OBSERVER] Started for", r.Station, "Image Complete:", img.complete);
-        } else {
-          console.warn("[POPUP OBSERVER] No popup container found for", r.Station);
-        }
-      });
-
-      marker.on('popupclose', function() {
-        console.log("[POPUP CLOSE] Marker:", r.Station, "Time:", new Date().toISOString());
-        if (popupObserver) {
-          popupObserver.disconnect();
-          popupObserver = null;
-          console.log("[POPUP OBSERVER] Disconnected for", r.Station);
-        }
-      });
-
-      marker.addTo(map);
-      displayedMarkers.push({ marker, deployment: r });
-      bounds.push([lat, lng]);
-      console.log("[MARKER] Added marker for:", r.Station, "Lat:", lat, "Lng:", lng);
-      console.log("[MARKER] Map bounds after adding:", map.getBounds().toBBoxString());
-    });
-
-    if(bounds.length){
-  if (selectedStation !== "All") {
-    const b = L.latLngBounds(bounds);
-    map.fitBounds(b.pad(0.2));
-  } else {
-    map.setView(defaultCenter, defaultZoom);
-  }
-} else {
-  map.setView(defaultCenter, defaultZoom);
-  console.log("[MAP] No bounds, set default view");
-    }
-
-    console.log("[FILTER] Rendering personnel table...");
-    renderPersonnelTable(filtered);
-    console.log("[FILTER] Rendering crime table...");
-    renderCrimeTable();
-    console.log("[FILTER] Updating summary box...");
-    updateSummaryBox(filtered);
-
-    console.log("[FILTER] Completed, markers:", displayedMarkers.length);
-    showLoading(false);
-  } catch(err) {
-    console.error("[FILTER] Error applying filters:", err, "Stack:", err.stack);
-    showLoading(false);
-  }
-}
-
-/* ===========================
-   RENDER PERSONNEL
-   ===========================
-*/
-function renderPersonnelTable(filteredDeployments){
-  try {
-    console.log("[RENDER PERSONNEL] Starting...");
-    personnelTbody.innerHTML = "";
-
-    // If no station selected or "All" -> show placeholder
-    if (!selectedStation || selectedStation === "All") {
-      personnelTbody.innerHTML = `
-        <tr>
-          <td colspan="4" style="padding:8px; color:#aaa; font-style:italic; text-align:center;">
-            Please select a station to show personnel list here
-          </td>
-        </tr>
-      `;
-      toggleLink.style.display = "none";
-      return;
-    }
-
-    const personRows = [];
-    filteredDeployments.forEach(dep => {
-      if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
-        // Combine all names into one string
-        const combinedNames = dep.PersonnelList.map(p => p.name || "").filter(Boolean).join(", ");
-        // Get the first non-empty mobile
-        const firstMobile = (dep.PersonnelList.find(p => p.mobile) || {}).mobile || "";
-        personRows.push({
-          name: combinedNames || dep.Name || "Unnamed",
-          mobile: firstMobile,
-          CallSign: dep.CallSign || "",
-          Station: dep.Station || "Unknown",
-          lat: dep.Lat,
-          lng: dep.Lng,
-          deployment: dep
-        });
-      } else {
-        personRows.push({
-          name: dep.Name || "Unnamed",
-          mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "",
-          CallSign: dep.CallSign || "",
-          Station: dep.Station || "Unknown",
-          lat: dep.Lat,
-          lng: dep.Lng,
-          deployment: dep
-        });
-      }
-    });
-
-    if(personRows.length === 0){
-      personnelTbody.innerHTML = "<tr><td colspan='4'>No personnel</td></tr>";
-      toggleLink.style.display = "none";
-      console.log("[RENDER PERSONNEL] No personnel to render");
-      return;
-    }
-
-    console.log("[RENDER PERSONNEL] Personnel rows:", personRows.length, personRows.slice(0,3));
-    const visible = personnelExpanded ? personRows : personRows.slice(0, 5);
-
-    const handleRowClick = debounce((p, tr, ev) => {
-      if (selectedRowEl) selectedRowEl.classList.remove("selected");
-      tr.className = "person-row selected";
-      selectedRowEl = tr;
-
-      const match = displayedMarkers.find(m => m.deployment === p.deployment);
-      if (match) {
-        try {
-          map.flyTo(match.marker.getLatLng(), 15, { animate: true, duration: 0.3 });
-          match.marker.openPopup();
-          addHighlight([match.deployment.Lat || FALLBACK_COORDS.lat, match.deployment.Lng || FALLBACK_COORDS.lng]);
-        } catch (e) {
-          console.error("[PERSON CLICK] FlyTo error:", e);
-        }
-      }
-    }, 300);
-
-    visible.forEach((p, idx) => {
-      const tr = document.createElement("tr");
-      tr.className = "person-row";
-      const mobileCell = p.mobile ? `<td>${makeContactLinks(p.mobile)}</td>` : `<td><span style="opacity:0.6">no mobile</span></td>`;
-      tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
-      tr.onclick = ev => handleRowClick(p, tr, ev);
-      personnelTbody.appendChild(tr);
-    });
-
-    toggleLink.style.display = personRows.length > 5 ? "inline-block" : "none";
-    toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${personRows.length})`;
-    console.log("[RENDER PERSONNEL] Completed, rows:", personRows.length);
-  } catch(err) {
-    console.error("[RENDER PERSONNEL] Error:", err, "Stack:", err.stack);
-  }
-}
-
-/* ===========================
-   RENDER CRIME TABLE
-   ===========================
-*/
-function renderCrimeTable(){
-  try {
-    console.log("[RENDER CRIME] Starting...");
-    crimeTbody.innerHTML = "";
-    if(!crimeData || !crimeData.length){
-      crimeTbody.innerHTML = "<tr><td colspan=3>No crime data</td></tr>";
-      console.log("[RENDER CRIME] No crime data");
-      return;
-    }
-
-    const station = stationSelect.value;
-
-    if(station === "All"){
-      // Default 8 focus crimes summary across all stations
-      const validStations = new Set(allData.map(d => d.Station));
-      const counts = {};
-      crimeData.forEach(c => {
-        if(c["Focus Crimes"] && validStations.has(c.Station)){
-          counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1;
-        }
-      });
-      FOCUS_CRIMES.forEach(cr => {
-        const cnt = counts[cr] || 0;
-        const tr = document.createElement("tr");
-        tr.className = "crime-row" + (cnt===0 ? " muted" : "");
-        tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>(all barangays)</td><td><center>${cnt}</center></td>`;
-        crimeTbody.appendChild(tr);
-      });
-    } else {
-      // Show ALL crimes for this specific station, grouped by Barangay
-      const normalized = normalize(station);
-      const stationCrimes = crimeData.filter(c => normalize(c.Station) === normalized);
-      if(!stationCrimes.length){
-        crimeTbody.innerHTML = "<tr><td colspan=3>No crimes for this station</td></tr>";
+    const cacheKey = 'nids_data_v3';
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, crime, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
+        allData = data; crimeData = crime;
+        refreshUI(); applyFilters();
+        showLoading(false);
         return;
       }
-
-      // group by Crime + Barangay
-      const counts = {};
-      stationCrimes.forEach(c => {
-        const crimeName = c["Focus Crimes"] || c.Crime || "(unknown)";
-        const brgy = c.Barangay || "(unknown)";
-        const key = crimeName + "|" + brgy;
-        counts[key] = (counts[key] || 0) + 1;
-      });
-
-      Object.entries(counts).forEach(([key, cnt])=>{
-        const [crimeName, brgy] = key.split("|");
-        const tr = document.createElement("tr");
-        tr.className = "crime-row";
-        tr.innerHTML = `<td>${escapeHtml(crimeName)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
-        crimeTbody.appendChild(tr);
-      });
     }
-    console.log("[RENDER CRIME] Completed");
-  } catch(err) {
-    console.error("[RENDER CRIME] Error:", err, "Stack:", err.stack);
+
+    const [depText, crimeText] = await Promise.all([
+      fetch(DEPLOYMENT_SHEET_CSV).then(r => r.text()),
+      fetch(CRIME_SHEET_CSV).then(r => r.text())
+    ]);
+
+    const dep = Papa.parse(depText, { header: true }).data;
+    const crime = Papa.parse(crimeText, { header: true }).data;
+
+    allData = dep.map(r => {
+      const coords = parseLatLngFromRow(r);
+      if (!coords) return null;
+      const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
+      const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
+      const type = getField(r, "Types Deployment", "Deployment Type") || "";
+      return {
+        Station: getField(r, "Station/Unit", "Station") || "Unknown",
+        Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
+        "Deployment Type": type,
+        CallSign: getField(r, "Call Sign", "Call Sign:") || "",
+        Location: getField(r, "Deployment Area", "Location") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture")),
+        PersonnelList: personnel.map((n, i) => ({ 
+          name: n, 
+          mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" 
+        })),
+        Lat: coords.lat, Lng: coords.lng,
+        Icon: getIcon(type)
+      };
+    }).filter(Boolean);
+
+    crimeData = crime.map(r => ({
+      Station: getField(r, "Station") || "Unknown",
+      "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
+      Barangay: getField(r, "Barangay") || "Unknown"
+    }));
+
+    localStorage.setItem(cacheKey, JSON.stringify({ data: allData, crime: crimeData, timestamp: Date.now() }));
+    refreshUI(); applyFilters();
+  } catch (e) {
+    summaryBox.innerHTML = "Using cached data.";
+    console.error(e);
+  } finally {
+    showLoading(false);
   }
 }
 
-
-/* ===========================
-   SUMMARY BOX
-   ===========================
-*/
-function updateSummaryBox(filteredRows){
-  try {
-    console.log("[UPDATE SUMMARY] Starting...");
-    if(!filteredRows) filteredRows = [];
-    if(filteredRows.length === 0){
-      summaryBox.innerHTML = "No personnel";
-      console.log("[UPDATE SUMMARY] No personnel");
-      return;
-    }	
-
-    if(stationSelect.value === "All"){
-      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
-      summaryBox.innerHTML = `<b>Total Personnel:</b> ${totalPersonnel}`;
-    } else {
-      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
-      const groups = {};
-      filteredRows.forEach(r=>{
-        const key = (r.Shift||"") + "||" + (r["Deployment Type"]||"");
-        groups[key] = groups[key] || { shift: r.Shift||"", type: r["Deployment Type"]||"", count:0 };
-        groups[key].count += (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList?1:0));
-      });
-      let rowsHtml = Object.values(groups).map(g => `<tr><td>${escapeHtml(g.shift)}</td><td>${escapeHtml(g.type)}</td><td>${g.count}</td></tr>`).join("");
-      if(!rowsHtml) rowsHtml = `<tr><td colspan=3>No deployment details</td></tr>`;
-      summaryBox.innerHTML = `<b>${escapeHtml(stationSelect.value)}</b><br>Total Personnel: ${totalPersonnel}<br><table><tr><td>Shift</td><td>Type</td><td>Count</td></tr>${rowsHtml}</table>`;
-    }
-    console.log("[UPDATE SUMMARY] Completed");
-  } catch(err) {
-    console.error("[UPDATE SUMMARY] Error:", err, "Stack:", err.stack);
-  }
+function getImageUrl(url) {
+  if (!url) return "";
+  const match = url.match(/id=([^&]+)/);
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : url;
 }
 
-/* ===========================
-   FILTER EVENT HANDLERS
-   ===========================
-*/
-stationSelect.onchange = function(){
-  try {
-    selectedStation = stationSelect.value;
-    selectedShift = "All";
-    selectedType = "All";
+function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
-    if(selectedStation === "All"){
-      shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
-      typeSelect.innerHTML = "<option value='All'>All</option>"; typeSelect.disabled = true;
-    } else {
-      const stationRows = allData.filter(d => normalize(d.Station) === normalize(selectedStation));
-      const shifts = [...new Set(stationRows.map(r => r.Shift || "Unspecified"))];
-      const types  = [...new Set(stationRows.map(r => r["Deployment Type"] || "Unspecified"))];
-      shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-      typeSelect.innerHTML  = "<option value='All'>All</option>" + types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
-      shiftSelect.disabled = false; typeSelect.disabled = false;
-    }
+/* =========================== FILTERS & MARKERS =========================== */
+function refreshUI() {
+  const stations = [...new Set(allData.map(d => d.Station))].sort();
+  stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
+  markerCluster.clearLayers();
+}
 
-    console.log("[STATION FILTER] Changed to:", selectedStation);
-    applyFilters();
-  } catch(err) {
-    console.error("[STATION FILTER] Error:", err, "Stack:", err.stack);
+function applyFilters() {
+  const isStation = currentUser.role === "station";
+  const station = isStation ? currentUser.station : selectedStation;
+
+  const filtered = allData.filter(d =>
+    (station === "All" || d.Station === station) &&
+    (selectedShift === "All" || d.Shift === selectedShift) &&
+    (selectedType === "All" || d["Deployment Type"] === selectedType)
+  );
+
+  markerCluster.clearLayers();
+  const bounds = [];
+
+  filtered.forEach(r => {
+    const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon });
+    const popup = `
+      <div style="max-width:280px;font-size:12px;">
+        <h3 style="margin:0 0 4px;background:rgba(255,204,0,0.15);padding:2px;color:#000;font-size:13px;">${r.Station}</h3>
+        <b>Area:</b> ${r.Location}<br>
+        <b>Shift:</b> ${r.Shift}<br>
+        <b>Type:</b> ${r["Deployment Type"]}<br>
+        <b>Callsign:</b> ${r.CallSign}<br>
+        ${r.PersonnelList.map(p => `<div style="margin:3px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
+        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:4px;border-radius:4px;" loading="lazy">` : ''}
+      </div>`;
+    marker.bindPopup(popup, { maxWidth: 300 });
+    markerCluster.addLayer(marker);
+    bounds.push([r.Lat, r.Lng]);
+  });
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+  else map.setView([9.3, 123.2], 10);
+
+  renderPersonnelTable(filtered);
+  renderCrimeTable(station);
+  updateSummaryBox(filtered, station);
+}
+
+/* =========================== PERSONNEL & CRIMES =========================== */
+function renderPersonnelTable(data) {
+  personnelTbody.innerHTML = "";
+  const rows = data.flatMap(d => 
+    d.PersonnelList.length > 0 
+      ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign }))
+      : [{ name: "No personnel", mobile: "", Station: d.Station, CallSign: d.CallSign }]
+  );
+  const visible = personnelExpanded ? rows : rows.slice(0, 5);
+  visible.forEach(p => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.name}</td><td>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</td><td>${p.CallSign}</td><td>${p.Station}</td>`;
+    personnelTbody.appendChild(tr);
+  });
+  toggleLink.style.display = rows.length > 5 ? "inline-block" : "none";
+  toggleLink.onclick = () => { personnelExpanded = !personnelExpanded; applyFilters(); };
+  toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${rows.length})`;
+}
+
+function renderCrimeTable(station) {
+  crimeTbody.innerHTML = "";
+  const crimes = station === "All" ? crimeData : crimeData.filter(c => c.Station === station);
+  const counts = {};
+  crimes.forEach(c => { 
+    counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; 
+  });
+
+  const focusCrimes = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
+  focusCrimes.forEach(crime => {
+    const count = counts[crime] || 0;
+    const barangays = [...new Set(crimes.filter(c => c["Focus Crimes"] === crime).map(c => c.Barangay))];
+    const brgyText = station === "All" ? "All" : (barangays.length > 0 ? barangays.join(", ") : "None");
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${crime}</td><td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${brgyText}">${brgyText}</td><td><center>${count}</center></td>`;
+    crimeTbody.appendChild(tr);
+  });
+}
+
+function updateSummaryBox(data, station) {
+  const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
+  summaryBox.innerHTML = `<b>${station}</b><br>Personnel: ${total}<br>Shift: ${selectedShift}`;
+}
+
+/* =========================== EXPORT =========================== */
+function exportToExcel() {
+  if (currentUser.role !== "admin") return;
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(allData.map(d => ({
+    Station: d.Station, Shift: d.Shift, Type: d["Deployment Type"],
+    Personnel: d.PersonnelList.map(p => p.name).join(", "),
+    Contact: d.PersonnelList[0]?.mobile || ""
+  })));
+  XLSX.utils.book_append_sheet(wb, ws, "Deployments");
+  XLSX.writeFile(wb, "NIDS_Export.xlsx");
+}
+
+async function exportToPDF() {
+  if (currentUser.role !== "admin") return;
+  const canvas = await html2canvas(document.getElementById('map'), { scale: 1.5 });
+  const img = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l', 'mm', 'a4');
+  pdf.addImage(img, 'PNG', 10, 10, 270, 180);
+  pdf.text("NIDS Report", 10, 200);
+  pdf.save("NIDS_Report.pdf");
+}
+
+/* =========================== LOGIN & INIT =========================== */
+document.getElementById("loginBtn").onclick = () => {
+  const u = document.getElementById("username").value.trim().toLowerCase();
+  const p = document.getElementById("password").value;
+  const chk = document.getElementById("rememberMeChk").checked;
+  if (USERS[u] && USERS[u].pass === p) {
+    currentUser = USERS[u];
+    document.getElementById("loginModal").remove();
+    document.querySelector(".app").style.display = "flex";
+    document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
+    setTimeout(() => {
+      map.invalidateSize();
+      initApp();
+    }, 100);
+  } else alert("Invalid credentials");
+};
+
+if (localStorage.getItem('nids_user')) {
+  currentUser = JSON.parse(localStorage.getItem('nids_user'));
+  document.querySelector(".app").style.display = "flex";
+  document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
+  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+  document.getElementById("loginModal").remove();
+  setTimeout(() => {
+    map.invalidateSize();
+    initApp();
+  }, 100);
+}
+
+function initApp() {
+  if (currentUser.role === "admin") {
+    document.getElementById("adminControls").style.display = "block";
+    document.getElementById("exportButtons").style.display = "flex";
+    document.getElementById("stationOnly").style.display = "none";
+  } else {
+    document.getElementById("adminControls").style.display = "none";
+    document.getElementById("exportButtons").style.display = "none";
+    document.getElementById("stationOnly").style.display = "block";
+    document.getElementById("lockedStation").textContent = currentUser.station;
+    selectedStation = currentUser.station;
   }
-};
-
-shiftSelect.onchange = function(){
-  try {
-    selectedShift = shiftSelect.value;
-    console.log("[SHIFT FILTER] Changed to:", selectedShift);
-    applyFilters();
-  } catch(err) {
-    console.error("[SHIFT FILTER] Error:", err, "Stack:", err.stack);
-  }
-};
-
-typeSelect.onchange = function(){
-  try {
-    selectedType = typeSelect.value;
-    console.log("[TYPE FILTER] Changed to:", selectedType);
-    applyFilters();
-  } catch(err) {
-    console.error("[TYPE FILTER] Error:", err, "Stack:", err.stack);
-  }
-};
-
-toggleLink.onclick = function(){
-  try {
-    personnelExpanded = !personnelExpanded;
-    console.log("[TOGGLE PERSONNEL] Expanded:", personnelExpanded);
-    applyFilters();
-  } catch(err) {
-    console.error("[TOGGLE PERSONNEL] Error:", err, "Stack:", err.stack);
-  }
-};
-
-refreshBtn.onclick = function(){
-  try {
-    selectedStation="All"; selectedShift="All"; selectedType="All";
-    stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
-    map.setView(defaultCenter, defaultZoom);
-    console.log("[REFRESH BTN] Triggered");
-    loadData();
-  } catch(err) {
-    console.error("[REFRESH BTN] Error:", err, "Stack:", err.stack);
-  }
-};
-
-/* ===========================
-   INITIAL LOAD
-   ===========================
-*/
-console.log("[INIT] Starting initial load...");
-loadData();
-
-/* ===========================
-   DEBUG: expose some helpers
-   ===========================
-*/
-window.__nids_debug = {
-  allData, crimeData, imageCache,
-  reload: loadData,
-  refreshUI,
-  applyFilters,
-  parseLatLngFromRow,
-  displayedMarkers
-};
-console.log("[INIT] nids debug hooks available at window.__nids_debug");
-
-// Auto refresh every 1 minute (60,000 ms)
-setInterval(() => {
-  console.log("[AUTO REFRESH] Reloading data in background...");
   loadData();
-}, 600000);	
 
-// Added Security Layer
-// Disable right-click context menu
-document.addEventListener('contextmenu', event => event.preventDefault());
-
-// Disable common DevTools shortcuts
-document.addEventListener('keydown', function(e) {
-  if (
-    e.keyCode === 123 || // F12
-    (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
-    (e.ctrlKey && e.keyCode === 85) // Ctrl+U
-  ) {
-    e.preventDefault();
-    return false;
-  }
-});
-
-
-	
+  stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
+  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_v3'); loadData(); };
+}
 </script>
 </body>
 </html>
