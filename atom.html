@@ -11,64 +11,46 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
-    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
-    .app{display:flex;height:100vh}
-    .sidebar {width: 28%; padding: 16px; background: var(--panel); box-sizing: border-box; overflow-y: auto; scrollbar-width: none;}
-    .sidebar::-webkit-scrollbar {display: none;}
-    h1{margin:0 0 10px 0;color:var(--gold);font-size:16px}
-    h2{margin:0 0 10px 0;color:var(--gold);font-size:12px}
-    label{display:block;font-size:13px;color:#ddd;margin:10px 0 6px}
-    select{width:100%;padding:8px;border-radius:6px;background:#2b2b2b;border:1px solid #333;color:#fff}
-    button{margin-top:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
-    th{background:#2a2a2a;color:var(--gold);text-align:left}
-    .crime-row{cursor:default}
-    .crime-row.muted{opacity:0.35; pointer-events: none;}
-    .person-row{cursor:pointer}
-    .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
-    .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
-    #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
-    #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.6); z-index:9999;pointer-events:none;opacity:0;transition:opacity .28s;}
-    #loadingOverlay.active{pointer-events:all;opacity:1}
-    .spinner{width:48px;height:48px;border-radius:50%;border:6px solid #222;border-top-color:var(--gold);animation:spin 1s linear infinite}
+    :root{--bg:#121212; --panel:#1f1f1f; --accent:#00bfff; --gold:#ffcc00;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body,#map,.main{height:100vh;width:100vw;overflow:hidden;}
+    body{background:var(--bg);color:#eee;font-family:Arial,sans-serif;display:flex;}
+    .app{flex:1;display:flex;height:100vh;}
+    .sidebar{width:28%;background:var(--panel);padding:16px;overflow-y:auto;}
+    h1{font-size:16px;color:var(--gold);margin-bottom:12px;}
+    label{font-size:13px;color:#ddd;margin:10px 0 6px;display:block;}
+    select,button{width:100%;padding:8px;border-radius:6px;margin-bottom:8px;background:#2b2b2b;border:1px solid #333;color:#fff;}
+    button{background:var(--accent);border:none;cursor:pointer;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th,td{padding:6px;border:1px solid #333;}
+    th{background:#2a2a2a;color:var(--gold);}
+    .person-row{cursor:pointer;}
+    .person-row.selected{background:rgba(255,204,0,0.15);font-weight:bold;}
+    .main{flex:1;position:relative;}
+    #map{width:100%;height:100%;border-radius:8px;}
+    #summaryBox{position:absolute;bottom:12px;left:12px;background:#000;color:yellow;padding:6px;border-radius:4px;font-size:115px;z-index:1000;max-width:360px;}
+    #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
+    #loadingOverlay.active{opacity:1;pointer-events:all;}
+    .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
-    #summaryBox{ position:absolute; bottom:12px; left:12px; background:black; color:yellow; padding:6px; border-radius:4px; font-size:11px; font-weight:500; z-index:500; max-width:360px; max-height:260px; overflow:auto; opacity:0.95;}
-    #summaryBox table{border-collapse:collapse;}
-    #summaryBox td{padding:2px 6px; border:1px solid #555; font-size:11px;}
-    .table-container { max-height: 110px; overflow-y: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.3s ease; }
-    .table-container.expanded { max-height: 380px; overflow-y: auto; scrollbar-width: thin; }
-    .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
-    a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
-
-    /* POPUP */
-    .leaflet-popup-content-wrapper.custom-popup { background: #1f1f1f; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.5); color: #eee; }
-    .popup-card { padding: 12px 14px; max-width: 380px; }
-    .popup-header h3 { margin: 0; font-size: 15px; background: rgba(255,204,0,0.15); color: #000; }
-    .popup-callsign { font-size: 12px; background: rgba(255,204,0,0.15); padding: 2px 6px; border-radius: 6px; }
-    .popup-row { font-size: 13px; margin: 4px 0; }
-    .popup-person .person-name { font-weight: 600; color: #9C2007; }
-
-    /* LOGIN */
-    #loginModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #121212 0%, #1a1a2e 50%, #16213e 100%); z-index: 10000; display: flex; align-items: center; justify-content: center; }
-    .login-box { background: #1f1f1f; padding: 24px; border-radius: 12px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #333; }
-    .login-box h2 { margin: 0 0 16px; color: var(--gold); text-align: center; }
-    .login-box input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #444; background: #2b2b2b; color: #fff; }
-    .login-box button { width: 100%; margin-top: 16px; }
-    #rememberMe { margin: 8px 0; display: flex; align-items: center; font-size: 12px; color: #ddd; }
-    #rememberMe input { width: auto; margin-right: 8px; }
-
-    #logoutBtn { background: #ff4444; float: right; padding: 4px 8px; font-size: 11px; margin-left: 8px; }
-    .export-btns { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .export-btns button { flex: 1; min-width: 100px; font-size: 11px; padding: 6px 8px; }
-
-    #stationOnly { display:none; margin:16px 0; padding:10px; background:#2a2a2a; border-radius:6px; text-align:center; }
+    .table-container{max-height:120px;overflow:hidden;transition:max-height .3s;}
+    .table-container.expanded{max-height:400px;overflow-y:auto;}
+    .toggle-link{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px;display:block;}
+    #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
+    .login-box{background:#1f1f1f;padding:24px;border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
+    .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;}
+    .login-box input{width:100%;padding:10px;margin:8px 0;border-radius:6px;background:#2b2b2b;border:1px solid #444;color:#fff;}
+    .login-box button{width:100%;margin-top:16px;}
+    #rememberMe{margin:8px 0;font-size:12px;color:#ddd;display:flex;align-items:center;}
+    #rememberMe input{width:auto;margin-right:8px;}
+    #logoutBtn{background:#ff4444;padding:4px 8px;font-size:11px;margin-left:8px;float:right;}
+    .export-btns{display:flex;gap:8px;margin-top:12px;}
+    .export-btns button{flex:1;font-size:11px;}
+    #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
   </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="loginModal">
   <div class="login-box">
     <h2>NIDS Login</h2>
@@ -76,7 +58,7 @@
     <input type="password" id="password" placeholder="Password" />
     <label id="rememberMe"><input type="checkbox" id="rememberMeChk" /> Remember Me</label>
     <button id="loginBtn">Login</button>
-    <div style="margin-top:10px; font-size:11px; color:#aaa;">
+    <div style="margin-top:10px;font-size:11px;color:#aaa;">
       <b>Demo:</b><br>
       <code>admin / admin123</code><br>
       <code>sibulan / sibulan123</code>
@@ -86,17 +68,18 @@
 
 <div class="app" style="display:none">
   <div class="sidebar">
-    <h1>NIDS 2.0 <span id="userInfo" style="font-size:12px; color:#aaa;"></span>
+    <h1>NIDS 2.0 
+      <span id="userInfo" style="font-size:12px;color:#aaa;"></span>
       <button id="refreshBtn">Refresh</button>
       <button id="logoutBtn">Logout</button>
     </h1>
 
     <div id="adminControls" style="display:none;">
-      <label for="stationFilter">Station</label>
+      <label>Station</label>
       <select id="stationFilter"><option value="All">All</option></select>
-      <label for="shiftFilter">Shift</label>
+      <label>Shift</label>
       <select id="shiftFilter"><option value="All">All</option></select>
-      <label for="typeFilter">Deployment Type</label>
+      <label>Deployment Type</label>
       <select id="typeFilter"><option value="All">All</option></select>
     </div>
 
@@ -115,7 +98,10 @@
     <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
 
     <h2 style="margin-top:20px">8 Focus Crimes</h2>
-    <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
+    <table id="crimeTable">
+      <thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead>
+      <tbody></tbody>
+    </table>
 
     <div id="exportButtons" class="export-btns" style="display:none;">
       <button onclick="exportToExcel()">Export Excel</button>
@@ -124,9 +110,8 @@
   </div>
 
   <div class="main">
-    <div id="map">
-      <div id="summaryBox">Loading...</div>
-    </div>
+    <div id="map"></div>
+    <div id="summaryBox">Loading...</div>
   </div>
 </div>
 
@@ -135,7 +120,7 @@
 <script>
 /* =========================== USERS =========================== */
 const USERS = {
-  "admin": { pass: "admin123", role: "admin", station: null },
+  "admin": { pass: "admin123", role: "admin" },
   "sibulan": { pass: "sibulan123", role: "station", station: "Sibulan PS" },
   "dumaguete": { pass: "dgte123", role: "station", station: "Dumaguete CPS" }
 };
@@ -144,6 +129,7 @@ let currentUser = null;
 let allData = [], crimeData = [];
 let displayedMarkers = [];
 let selectedStation = "All", selectedShift = "All", selectedType = "All";
+let personnelExpanded = false;
 
 /* DOM */
 const stationSelect = document.getElementById("stationFilter");
@@ -156,23 +142,45 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
+/* =========================== ROBUST FIELD MATCHER =========================== */
+function getField(row, ...keys) {
+  if (!row) return "";
+  const rowLower = {};
+  for (const key in row) {
+    rowLower[key.toLowerCase().replace(/[:\.\s].*/g, '')] = row[key]; // Strip notes
+  }
+  for (const key of keys) {
+    const cleanKey = key.toLowerCase().replace(/[:\.\s].*/g, '');
+    if (rowLower[cleanKey] !== undefined && String(rowLower[cleanKey]).trim()) {
+      return rowLower[cleanKey];
+    }
+  }
+  return "";
+}
+
+/* =========================== LAT/LNG PARSER (Handles Notes) =========================== */
+function parseLatLngFromRow(r) {
+  const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
+  if (!latField) return { lat: 9.3, lng: 123.2 };
+  const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
+  if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+  return { lat: 9.3, lng: 123.2 };
+}
+
 /* =========================== LOGIN =========================== */
 document.getElementById("loginBtn").onclick = () => {
-  const username = document.getElementById("username").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
-  const rememberMe = document.getElementById("rememberMeChk").checked;
-
-  if (USERS[username] && USERS[username].pass === password) {
-    currentUser = USERS[username];
+  const u = document.getElementById("username").value.trim().toLowerCase();
+  const p = document.getElementById("password").value;
+  const chk = document.getElementById("rememberMeChk").checked;
+  if (USERS[u] && USERS[u].pass === p) {
+    currentUser = USERS[u];
     document.getElementById("loginModal").remove();
     document.querySelector(".app").style.display = "flex";
     document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
     document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
-    if (rememberMe) localStorage.setItem('nids_user', JSON.stringify(currentUser));
+    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
     initApp();
-  } else {
-    alert("Invalid credentials");
-  }
+  } else alert("Invalid credentials");
 };
 
 if (localStorage.getItem('nids_user')) {
@@ -184,40 +192,13 @@ if (localStorage.getItem('nids_user')) {
   initApp();
 }
 
-/* =========================== MAP =========================== */
-const map = L.map('map').setView([9.3, 123.2], 9);
+/* =========================== MAP (FULL SCREEN) =========================== */
+const map = L.map('map').setView([9.3, 123.2], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+/* =========================== DATA URLS =========================== */
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
-
-function getField(row, ...keys) {
-  for (const k of keys) {
-    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim()) return row[k];
-  }
-  return "";
-}
-
-function parseLatLngFromRow(r) {
-  const combined = getField(r, "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ", "Latitude, Longitude", "Lat_Long");
-  if (combined) {
-    const parts = combined.split(/[,;\/\s()]+/).map(p => p.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
-      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-    }
-  }
-  return { lat: 9.3, lng: 123.2 };
-}
-
-function getImageUrl(url) {
-  if (!url) return "https://via.placeholder.com/160x90.png";
-  try {
-    const match = url.match(/id=([^&]+)/);
-    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
-  } catch (e) {}
-  return url;
-}
 
 /* =========================== LOAD DATA =========================== */
 async function loadData() {
@@ -230,22 +211,23 @@ async function loadData() {
 
     allData = dep.map(r => {
       const { lat, lng } = parseLatLngFromRow(r);
-      const personnel = getField(r, "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ").split(",").map(p => p.trim()).filter(Boolean);
+      const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
+      const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
       return {
-        Station: getField(r, "Station/Unit") || "Unknown",
-        Shift: getField(r, "Duty Shift:") || "Unspecified",
-        "Deployment Type": getField(r, "Types Deployment:") || "Unspecified",
-        CallSign: getField(r, "Call Sign:") || "",
-        Location: getField(r, "Deployment Area") || "",
-        Photo: getImageUrl(getField(r, "Picture with Timestamp:")),
-        PersonnelList: personnel.length ? personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number:") : "" })) : [],
+        Station: getField(r, "Station/Unit", "Station") || "Unknown",
+        Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
+        "Deployment Type": getField(r, "Types Deployment", "Types Deployment:") || "Unspecified",
+        CallSign: getField(r, "Call Sign", "Call Sign:") || "",
+        Location: getField(r, "Deployment Area", "Location") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture with timestamp")),
+        PersonnelList: personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" })),
         Lat: lat, Lng: lng
       };
-    });
+    }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0);
 
     crimeData = crime.map(r => ({
       Station: getField(r, "Station") || "Unknown",
-      "Focus Crimes": getField(r, "Focus Crimes") || "",
+      "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
       Barangay: getField(r, "Barangay") || ""
     }));
 
@@ -258,6 +240,15 @@ async function loadData() {
   } finally {
     showLoading(false);
   }
+}
+
+function getImageUrl(url) {
+  if (!url) return "https://via.placeholder.com/160x90.png";
+  try {
+    const match = url.match(/id=([^&]+)/);
+    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
+  } catch (e) {}
+  return url;
 }
 
 function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
@@ -300,21 +291,22 @@ function applyFilters() {
 
   filtered.forEach(r => {
     const marker = L.marker([r.Lat, r.Lng]).addTo(map);
-    const popup = `<div class="popup-card">
-      <div class="popup-header"><h3>${r.Station}</h3></div>
-      <div class="popup-row"><b>Area:</b> ${r.Location}</div>
-      <div class="popup-row"><b>Shift:</b> ${r.Shift}</div>
-      <div class="popup-row"><b>Type:</b> ${r["Deployment Type"]}</div>
-      <div class="popup-row"><b>Callsign:</b> ${r.CallSign}</div>
-      ${r.PersonnelList.map(p => `<div class="popup-person"><span class="person-name">${p.name}</span><br>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</div>`).join("")}
-      ${r.Photo ? `<img src="${r.Photo}" style="max-width:160px; margin-top:8px; border-radius:6px;">` : ''}
+    const popup = `<div style="max-width:380px;font-size:13px;">
+      <h3 style="margin:0 0 8px;background:rgba(255,204,0,0.15);padding:4px;color:#000;">${r.Station}</h3>
+      <b>Area:</b> ${r.Location}<br>
+      <b>Shift:</b> ${r.Shift}<br>
+      <b>Type:</b> ${r["Deployment Type"]}<br>
+      <b>Callsign:</b> ${r.CallSign}<br>
+      ${r.PersonnelList.map(p => `<div style="margin:6px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</div>`).join("")}
+      ${r.Photo ? `<img src="${r.Photo}" style="max-width:160px;margin-top:8px;border-radius:6px;">` : ''}
     </div>`;
-    marker.bindPopup(popup, { maxWidth: 400 });
+    marker.bindPopup(popup);
     displayedMarkers.push({ marker, data: r });
     bounds.push([r.Lat, r.Lng]);
   });
 
   if (bounds.length) map.fitBounds(bounds, { padding: [50, 50] });
+  else map.setView([9.3, 123.2], 10);
 
   renderPersonnelTable(filtered);
   renderCrimeTable(station);
@@ -325,14 +317,16 @@ function applyFilters() {
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
   const rows = data.flatMap(d => d.PersonnelList.length ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })) : [{ name: "Unnamed", mobile: "", Station: d.Station, CallSign: d.CallSign }]);
-  rows.slice(0, 5).forEach(p => {
+  const visible = personnelExpanded ? rows : rows.slice(0, 5);
+  visible.forEach(p => {
     const tr = document.createElement("tr");
     tr.className = "person-row";
     tr.innerHTML = `<td>${p.name}</td><td>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</td><td>${p.CallSign}</td><td>${p.Station}</td>`;
     personnelTbody.appendChild(tr);
   });
   toggleLink.style.display = rows.length > 5 ? "inline-block" : "none";
-  toggleLink.onclick = () => { /* expand logic */ };
+  toggleLink.onclick = () => { personnelExpanded = !personnelExpanded; applyFilters(); };
+  toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${rows.length})`;
 }
 
 function renderCrimeTable(station) {
@@ -367,12 +361,12 @@ function exportToExcel() {
 
 async function exportToPDF() {
   if (currentUser.role !== "admin") return;
-  const canvas = await html2canvas(document.getElementById('map'));
+  const canvas = await html2canvas(document.getElementById('map'), { scale: 1.5 });
   const img = canvas.toDataURL('image/png');
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  pdf.addImage(img, 'PNG', 10, 10, 190, 120);
-  pdf.text("NIDS Report", 10, 140);
+  const pdf = new jsPDF('l', 'mm', 'a4');
+  pdf.addImage(img, 'PNG', 10, 10, 270, 180);
+  pdf.text("NIDS Report", 10, 200);
   pdf.save("NIDS_Report.pdf");
 }
 
@@ -396,7 +390,6 @@ function initApp() {
   typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
   refreshBtn.onclick = loadData;
 }
-
 </script>
 </body>
 </html>
