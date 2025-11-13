@@ -13,7 +13,7 @@
   <style>
     :root{--bg:#121212; --panel:#1f1f1f; --accent:#00bfff; --gold:#ffcc00;}
     *{margin:0;padding:0;box-sizing:border-box;}
-    html,body,#map,.main{height:100vh;width:100vw;overflow:hidden;}
+    html,body,#map,.main,.app{height:100vh;width:100vw;overflow:hidden;}
     body{background:var(--bg);color:#eee;font-family:Arial,sans-serif;display:flex;}
     .app{flex:1;display:flex;height:100vh;}
     .sidebar{width:28%;background:var(--panel);padding:16px;overflow-y:auto;}
@@ -28,14 +28,25 @@
     .person-row.selected{background:rgba(255,204,0,0.15);font-weight:bold;}
     .main{flex:1;position:relative;}
     #map{width:100%;height:100%;border-radius:8px;}
-    #summaryBox{position:absolute;bottom:12px;left:12px;background:#000;color:yellow;padding:6px;border-radius:4px;font-size:115px;z-index:1000;max-width:360px;}
+    
+    /* SUMMARY BOX – FIXED FONT */
+    #summaryBox{
+      position:absolute; bottom:12px; left:12px; background:#000; color:yellow; 
+      padding:6px; border-radius:4px; font-size:11px; font-weight:500; 
+      z-index:1000; max-width:320px; max-height:200px; overflow:auto;
+    }
+    #summaryBox table{border-collapse:collapse;}
+    #summaryBox td{padding:2px 4px; border:1px solid #555; font-size:11px;}
+
     #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
     #loadingOverlay.active{opacity:1;pointer-events:all;}
     .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
+
     .table-container{max-height:120px;overflow:hidden;transition:max-height .3s;}
     .table-container.expanded{max-height:400px;overflow-y:auto;}
     .toggle-link{color:var(--accent);font-size:12px;cursor:pointer;margin-top:4px;display:block;}
+
     #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
     .login-box{background:#1f1f1f;padding:24px;border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
     .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;}
@@ -47,6 +58,12 @@
     .export-btns{display:flex;gap:8px;margin-top:12px;}
     .export-btns button{flex:1;font-size:11px;}
     #stationOnly{display:none;margin:16px 0;padding:10px;background:#2a2a2a;border-radius:6px;text-align:center;}
+
+    /* ICONS – RESTORED */
+    .icon-patrol { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-car.png') no-repeat center; background-size: contain; }
+    .icon-checkpoint { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/road-block.png') no-repeat center; background-size: contain; }
+    .icon-mobile { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-officer.png') no-repeat center; background-size: contain; }
+    .icon-station { width: 32px; height: 32px; background: url('https://img.icons8.com/fluency/48/police-station.png') no-repeat center; background-size: contain; }
   </style>
 </head>
 <body>
@@ -142,12 +159,13 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== ROBUST FIELD MATCHER =========================== */
+/* =========================== FIELD MATCHER =========================== */
 function getField(row, ...keys) {
   if (!row) return "";
   const rowLower = {};
   for (const key in row) {
-    rowLower[key.toLowerCase().replace(/[:\.\s].*/g, '')] = row[key]; // Strip notes
+    const clean = key.toLowerCase().replace(/[:\.\s].*/g, '');
+    rowLower[clean] = row[key];
   }
   for (const key of keys) {
     const cleanKey = key.toLowerCase().replace(/[:\.\s].*/g, '');
@@ -158,13 +176,29 @@ function getField(row, ...keys) {
   return "";
 }
 
-/* =========================== LAT/LNG PARSER (Handles Notes) =========================== */
+/* =========================== LAT/LNG + ICONS =========================== */
 function parseLatLngFromRow(r) {
   const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat");
   if (!latField) return { lat: 9.3, lng: 123.2 };
   const match = latField.match(/(\d+\.\d+)[^\d]*(\d+\.\d+)/);
   if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
   return { lat: 9.3, lng: 123.2 };
+}
+
+function getIcon(type) {
+  const icons = {
+    "Patrol": "icon-patrol",
+    "Checkpoint": "icon-checkpoint",
+    "Mobile Patrol": "icon-mobile",
+    "Station": "icon-station"
+  };
+  const cls = icons[type] || "icon-patrol";
+  return L.divIcon({
+    className: "custom-icon",
+    html: `<div class="${cls}"></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32]
+  });
 }
 
 /* =========================== LOGIN =========================== */
@@ -192,8 +226,8 @@ if (localStorage.getItem('nids_user')) {
   initApp();
 }
 
-/* =========================== MAP (FULL SCREEN) =========================== */
-const map = L.map('map').setView([9.3, 123.2], 10);
+/* =========================== MAP (FULL SCREEN FOR ALL) =========================== */
+const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 /* =========================== DATA URLS =========================== */
@@ -213,15 +247,17 @@ async function loadData() {
       const { lat, lng } = parseLatLngFromRow(r);
       const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)");
       const personnel = personnelStr ? personnelStr.split(",").map(p => p.trim()).filter(Boolean) : [];
+      const type = getField(r, "Types Deployment", "Deployment Type");
       return {
         Station: getField(r, "Station/Unit", "Station") || "Unknown",
         Shift: getField(r, "Duty Shift", "Duty Shift:") || "Unspecified",
-        "Deployment Type": getField(r, "Types Deployment", "Types Deployment:") || "Unspecified",
+        "Deployment Type": type || "Unspecified",
         CallSign: getField(r, "Call Sign", "Call Sign:") || "",
         Location: getField(r, "Deployment Area", "Location") || "",
-        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture with timestamp")),
+        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture")),
         PersonnelList: personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:") : "" })),
-        Lat: lat, Lng: lng
+        Lat: lat, Lng: lng,
+        Icon: getIcon(type)
       };
     }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0);
 
@@ -243,22 +279,20 @@ async function loadData() {
 }
 
 function getImageUrl(url) {
-  if (!url) return "https://via.placeholder.com/160x90.png";
+  if (!url) return "";
   try {
     const match = url.match(/id=([^&]+)/);
-    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
+    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w320`;
   } catch (e) {}
   return url;
 }
 
 function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
 
-/* =========================== UI =========================== */
+/* =========================== UI & FILTERS =========================== */
 function refreshUI() {
   const stations = [...new Set(allData.map(d => d.Station))].sort();
   stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
-  shiftSelect.innerHTML = "<option value='All'>All</option>";
-  typeSelect.innerHTML = "<option value='All'>All</option>";
   displayedMarkers.forEach(m => map.removeLayer(m.marker));
   displayedMarkers = [];
 }
@@ -274,7 +308,6 @@ function forceCurrentShiftFilter() {
   }
 }
 
-/* =========================== FILTERS =========================== */
 function applyFilters() {
   const isStation = currentUser.role === "station";
   const station = isStation ? currentUser.station : selectedStation;
@@ -290,30 +323,34 @@ function applyFilters() {
   const bounds = [];
 
   filtered.forEach(r => {
-    const marker = L.marker([r.Lat, r.Lng]).addTo(map);
-    const popup = `<div style="max-width:380px;font-size:13px;">
-      <h3 style="margin:0 0 8px;background:rgba(255,204,0,0.15);padding:4px;color:#000;">${r.Station}</h3>
-      <b>Area:</b> ${r.Location}<br>
-      <b>Shift:</b> ${r.Shift}<br>
-      <b>Type:</b> ${r["Deployment Type"]}<br>
-      <b>Callsign:</b> ${r.CallSign}<br>
-      ${r.PersonnelList.map(p => `<div style="margin:6px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</div>`).join("")}
-      ${r.Photo ? `<img src="${r.Photo}" style="max-width:160px;margin-top:8px;border-radius:6px;">` : ''}
-    </div>`;
-    marker.bindPopup(popup);
+    const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon }).addTo(map);
+    const popup = `
+      <div style="max-width:300px;font-size:12px;">
+        <h3 style="margin:0 0 6px;background:rgba(255,204,0,0.15);padding:3px;color:#000;font-size:14px;">${r.Station}</h3>
+        <b>Area:</b> ${r.Location}<br>
+        <b>Shift:</b> ${r.Shift}<br>
+        <b>Type:</b> ${r["Deployment Type"]}<br>
+        <b>Callsign:</b> ${r.CallSign}<br>
+        ${r.PersonnelList.map(p => `<div style="margin:4px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
+        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:6px;border-radius:6px;" loading="lazy">` : ''}
+      </div>`;
+    marker.bindPopup(popup, { maxWidth: 320 });
     displayedMarkers.push({ marker, data: r });
     bounds.push([r.Lat, r.Lng]);
   });
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [50, 50] });
-  else map.setView([9.3, 123.2], 10);
+  if (bounds.length) {
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  } else {
+    map.setView([9.3, 123.2], 10);
+  }
 
   renderPersonnelTable(filtered);
   renderCrimeTable(station);
   updateSummaryBox(filtered, station);
 }
 
-/* =========================== TABLES =========================== */
+/* =========================== TABLES & SUMMARY =========================== */
 function renderPersonnelTable(data) {
   personnelTbody.innerHTML = "";
   const rows = data.flatMap(d => d.PersonnelList.length ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })) : [{ name: "Unnamed", mobile: "", Station: d.Station, CallSign: d.CallSign }]);
@@ -343,7 +380,7 @@ function renderCrimeTable(station) {
 
 function updateSummaryBox(data, station) {
   const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
-  summaryBox.innerHTML = `<b>${station}</b><br>Total Personnel: ${total}`;
+  summaryBox.innerHTML = `<b>${station}</b><br>Total Personnel: ${total}<br>Shift: ${selectedShift}`;
 }
 
 /* =========================== EXPORT =========================== */
