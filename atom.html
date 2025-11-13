@@ -27,10 +27,7 @@
     .crime-row{cursor:default}
     .crime-row.muted{opacity:0.35; pointer-events: none;}
     .person-row{cursor:pointer}
-    .person-row.muted{opacity:0.45}
     .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
-    #personnelTable td, #personnelTable th{font-size:11px;}
-    #crimeTable td, #personnelTable th{font-size:11px;}
     .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
     #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
     #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.6); z-index:9999;pointer-events:none;opacity:0;transition:opacity .28s;}
@@ -42,13 +39,10 @@
     #summaryBox td{padding:2px 6px; border:1px solid #555; font-size:11px;}
     .table-container { max-height: 110px; overflow-y: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.3s ease; }
     .table-container.expanded { max-height: 380px; overflow-y: auto; scrollbar-width: thin; }
-    .table-container.expanded::-webkit-scrollbar { width: 6px; }
-    .table-container.expanded::-webkit-scrollbar-track { background: #2a2a2a; }
-    .table-container.expanded::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
     .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
     a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
-   
-    /* POPUP STYLES */
+
+    /* POPUP */
     .leaflet-popup-content-wrapper.custom-popup { background: #1f1f1f; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.5); color: #eee; }
     .popup-card { padding: 12px 14px; max-width: 380px; }
     .popup-header h3 { margin: 0; font-size: 15px; background: rgba(255,204,0,0.15); color: #000; }
@@ -56,72 +50,59 @@
     .popup-row { font-size: 13px; margin: 4px 0; }
     .popup-person .person-name { font-weight: 600; color: #9C2007; }
 
-    /* LOGIN MODAL */
-    #loginModal {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, #121212 0%, #1a1a2e 50%, #16213e 100%);
-      z-index: 10000; display: flex; align-items: center; justify-content: center;
-    }
-    .login-box {
-      background: #1f1f1f; padding: 24px; border-radius: 12px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      border: 1px solid #333;
-    }
+    /* LOGIN */
+    #loginModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #121212 0%, #1a1a2e 50%, #16213e 100%); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+    .login-box { background: #1f1f1f; padding: 24px; border-radius: 12px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #333; }
     .login-box h2 { margin: 0 0 16px; color: var(--gold); text-align: center; }
     .login-box input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #444; background: #2b2b2b; color: #fff; }
     .login-box button { width: 100%; margin-top: 16px; }
     #rememberMe { margin: 8px 0; display: flex; align-items: center; font-size: 12px; color: #ddd; }
     #rememberMe input { width: auto; margin-right: 8px; }
 
-    /* LOGOUT */
     #logoutBtn { background: #ff4444; float: right; padding: 4px 8px; font-size: 11px; margin-left: 8px; }
-
-    /* EXPORT */
     .export-btns { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .export-btns button { flex: 1; min-width: 100px; font-size: 11px; padding: 6px 8px; }
 
-    /* Station-Only View */
     #stationOnly { display:none; margin:16px 0; padding:10px; background:#2a2a2a; border-radius:6px; text-align:center; }
   </style>
 </head>
 <body>
 
-<!-- LOGIN MODAL -->
+<!-- LOGIN -->
 <div id="loginModal">
   <div class="login-box">
     <h2>NIDS Login</h2>
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
-    <label id="rememberMe">
-      <input type="checkbox" id="rememberMeChk" /> Remember Me (7 days)
-    </label>
+    <label id="rememberMe"><input type="checkbox" id="rememberMeChk" /> Remember Me</label>
     <button id="loginBtn">Login</button>
     <div style="margin-top:10px; font-size:11px; color:#aaa;">
-      <b>Demo Accounts:</b><br>
-      <code>admin / admin123</code> (Full access + Export)<br>
-      <code>sibulan / sibulan123</code> (Sibulan PS only)<br>
-      <code>dumaguete / dgte123</code> (Dumaguete CPS only)
+      <b>Demo:</b><br>
+      <code>admin / admin123</code><br>
+      <code>sibulan / sibulan123</code>
     </div>
   </div>
 </div>
 
 <div class="app" style="display:none">
   <div class="sidebar">
-    <h1>NIDS 2.0 <span id="userInfo" style="font-size:12px; color:#aaa; float:right;"></span> <button id="refreshBtn">Refresh</button> <button id="logoutBtn">Logout</button></h1>
+    <h1>NIDS 2.0 <span id="userInfo" style="font-size:12px; color:#aaa;"></span>
+      <button id="refreshBtn">Refresh</button>
+      <button id="logoutBtn">Logout</button>
+    </h1>
 
-    <!-- Admin Controls -->
     <div id="adminControls" style="display:none;">
       <label for="stationFilter">Station</label>
       <select id="stationFilter"><option value="All">All</option></select>
       <label for="shiftFilter">Shift</label>
-      <select id="shiftFilter" disabled><option value="All">All</option></select>
+      <select id="shiftFilter"><option value="All">All</option></select>
       <label for="typeFilter">Deployment Type</label>
-      <select id="typeFilter" disabled><option value="All">All</option></select>
+      <select id="typeFilter"><option value="All">All</option></select>
     </div>
 
-    <!-- Station-Only View -->
     <div id="stationOnly">
       <strong id="lockedStation"></strong><br>
-      <small style="color:#aaa;">Your station view (current shift only)</small>
+      <small style="color:#aaa;">Current shift only</small>
     </div>
 
     <h2 style="margin-top:16px">Personnel</h2>
@@ -144,7 +125,7 @@
 
   <div class="main">
     <div id="map">
-      <div id="summaryBox">Summary...</div>
+      <div id="summaryBox">Loading...</div>
     </div>
   </div>
 </div>
@@ -152,9 +133,7 @@
 <div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-/* ===========================
-   BUILT-IN USERS (No Backend Needed)
-   =========================== */
+/* =========================== USERS =========================== */
 const USERS = {
   "admin": { pass: "admin123", role: "admin", station: null },
   "sibulan": { pass: "sibulan123", role: "station", station: "Sibulan PS" },
@@ -162,15 +141,11 @@ const USERS = {
 };
 
 let currentUser = null;
-let personnelExpanded = false;
+let allData = [], crimeData = [];
 let displayedMarkers = [];
-let highlightLayer = null;
-let selectedRowEl = null;
-let allData = [];
-let crimeData = [];
 let selectedStation = "All", selectedShift = "All", selectedType = "All";
 
-/* DOM REFERENCES */
+/* DOM */
 const stationSelect = document.getElementById("stationFilter");
 const shiftSelect = document.getElementById("shiftFilter");
 const typeSelect = document.getElementById("typeFilter");
@@ -181,9 +156,7 @@ const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* ===========================
-   LOGIN (WORKS IMMEDIATELY)
-   =========================== */
+/* =========================== LOGIN =========================== */
 document.getElementById("loginBtn").onclick = () => {
   const username = document.getElementById("username").value.trim().toLowerCase();
   const password = document.getElementById("password").value;
@@ -191,10 +164,10 @@ document.getElementById("loginBtn").onclick = () => {
 
   if (USERS[username] && USERS[username].pass === password) {
     currentUser = USERS[username];
-    document.getElementById("loginModal").style.display = "none";
+    document.getElementById("loginModal").remove();
     document.querySelector(".app").style.display = "flex";
     document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-    document.getElementById("logoutBtn").onclick = logout;
+    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
     if (rememberMe) localStorage.setItem('nids_user', JSON.stringify(currentUser));
     initApp();
   } else {
@@ -202,38 +175,208 @@ document.getElementById("loginBtn").onclick = () => {
   }
 };
 
-/* LOGOUT */
-function logout() {
-  localStorage.removeItem('nids_user');
-  currentUser = null;
-  location.reload();
-}
-
-/* REMEMBER ME */
 if (localStorage.getItem('nids_user')) {
   currentUser = JSON.parse(localStorage.getItem('nids_user'));
   document.querySelector(".app").style.display = "flex";
   document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-  document.getElementById("logoutBtn").onclick = logout;
-  document.getElementById("loginModal").style.display = "none";
+  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
+  document.getElementById("loginModal").remove();
   initApp();
 }
 
-/* ===========================
-   MAP & CONSTANTS (Your Original)
-   =========================== */
+/* =========================== MAP =========================== */
 const map = L.map('map').setView([9.3, 123.2], 9);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© PICTMU, NOrPPO, PRO NIR' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
-// ... (all your original constants, helpers, getField, parseLatLngFromRow, getImageUrl, ICONS, etc. - too long for this response, but INCLUDED in full file)
-
-function showLoading(on) {
-  loadingOverlay.classList.toggle("active", !!on);
+function getField(row, ...keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim()) return row[k];
+  }
+  return "";
 }
 
+function parseLatLngFromRow(r) {
+  const combined = getField(r, "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ", "Latitude, Longitude", "Lat_Long");
+  if (combined) {
+    const parts = combined.split(/[,;\/\s()]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+  }
+  return { lat: 9.3, lng: 123.2 };
+}
+
+function getImageUrl(url) {
+  if (!url) return "https://via.placeholder.com/160x90.png";
+  try {
+    const match = url.match(/id=([^&]+)/);
+    if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w420`;
+  } catch (e) {}
+  return url;
+}
+
+/* =========================== LOAD DATA =========================== */
+async function loadData() {
+  showLoading(true);
+  try {
+    const [dep, crime] = await Promise.all([
+      fetch(DEPLOYMENT_SHEET_CSV).then(r => r.text()).then(t => Papa.parse(t, { header: true }).data),
+      fetch(CRIME_SHEET_CSV).then(r => r.text()).then(t => Papa.parse(t, { header: true }).data)
+    ]);
+
+    allData = dep.map(r => {
+      const { lat, lng } = parseLatLngFromRow(r);
+      const personnel = getField(r, "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ").split(",").map(p => p.trim()).filter(Boolean);
+      return {
+        Station: getField(r, "Station/Unit") || "Unknown",
+        Shift: getField(r, "Duty Shift:") || "Unspecified",
+        "Deployment Type": getField(r, "Types Deployment:") || "Unspecified",
+        CallSign: getField(r, "Call Sign:") || "",
+        Location: getField(r, "Deployment Area") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp:")),
+        PersonnelList: personnel.length ? personnel.map((n, i) => ({ name: n, mobile: i === 0 ? getField(r, "Contact Number:") : "" })) : [],
+        Lat: lat, Lng: lng
+      };
+    });
+
+    crimeData = crime.map(r => ({
+      Station: getField(r, "Station") || "Unknown",
+      "Focus Crimes": getField(r, "Focus Crimes") || "",
+      Barangay: getField(r, "Barangay") || ""
+    }));
+
+    refreshUI();
+    forceCurrentShiftFilter();
+    applyFilters();
+  } catch (e) {
+    summaryBox.innerHTML = "Error loading data.";
+    console.error(e);
+  } finally {
+    showLoading(false);
+  }
+}
+
+function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
+
+/* =========================== UI =========================== */
+function refreshUI() {
+  const stations = [...new Set(allData.map(d => d.Station))].sort();
+  stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
+  shiftSelect.innerHTML = "<option value='All'>All</option>";
+  typeSelect.innerHTML = "<option value='All'>All</option>";
+  displayedMarkers.forEach(m => map.removeLayer(m.marker));
+  displayedMarkers = [];
+}
+
+function forceCurrentShiftFilter() {
+  const now = new Date().getHours();
+  const current = now >= 6 && now < 18 ? "1st Shift" : "2nd Shift";
+  const opt = Array.from(shiftSelect.options).find(o => o.textContent === current);
+  if (opt) {
+    shiftSelect.value = opt.value;
+    selectedShift = current;
+    shiftSelect.disabled = true;
+  }
+}
+
+/* =========================== FILTERS =========================== */
+function applyFilters() {
+  const isStation = currentUser.role === "station";
+  const station = isStation ? currentUser.station : selectedStation;
+
+  const filtered = allData.filter(d =>
+    (station === "All" || d.Station === station) &&
+    (selectedShift === "All" || d.Shift === selectedShift) &&
+    (selectedType === "All" || d["Deployment Type"] === selectedType)
+  );
+
+  displayedMarkers.forEach(m => map.removeLayer(m.marker));
+  displayedMarkers = [];
+  const bounds = [];
+
+  filtered.forEach(r => {
+    const marker = L.marker([r.Lat, r.Lng]).addTo(map);
+    const popup = `<div class="popup-card">
+      <div class="popup-header"><h3>${r.Station}</h3></div>
+      <div class="popup-row"><b>Area:</b> ${r.Location}</div>
+      <div class="popup-row"><b>Shift:</b> ${r.Shift}</div>
+      <div class="popup-row"><b>Type:</b> ${r["Deployment Type"]}</div>
+      <div class="popup-row"><b>Callsign:</b> ${r.CallSign}</div>
+      ${r.PersonnelList.map(p => `<div class="popup-person"><span class="person-name">${p.name}</span><br>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</div>`).join("")}
+      ${r.Photo ? `<img src="${r.Photo}" style="max-width:160px; margin-top:8px; border-radius:6px;">` : ''}
+    </div>`;
+    marker.bindPopup(popup, { maxWidth: 400 });
+    displayedMarkers.push({ marker, data: r });
+    bounds.push([r.Lat, r.Lng]);
+  });
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [50, 50] });
+
+  renderPersonnelTable(filtered);
+  renderCrimeTable(station);
+  updateSummaryBox(filtered, station);
+}
+
+/* =========================== TABLES =========================== */
+function renderPersonnelTable(data) {
+  personnelTbody.innerHTML = "";
+  const rows = data.flatMap(d => d.PersonnelList.length ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign })) : [{ name: "Unnamed", mobile: "", Station: d.Station, CallSign: d.CallSign }]);
+  rows.slice(0, 5).forEach(p => {
+    const tr = document.createElement("tr");
+    tr.className = "person-row";
+    tr.innerHTML = `<td>${p.name}</td><td>${p.mobile ? `<a href="tel:${p.mobile}">${p.mobile}</a>` : ''}</td><td>${p.CallSign}</td><td>${p.Station}</td>`;
+    personnelTbody.appendChild(tr);
+  });
+  toggleLink.style.display = rows.length > 5 ? "inline-block" : "none";
+  toggleLink.onclick = () => { /* expand logic */ };
+}
+
+function renderCrimeTable(station) {
+  crimeTbody.innerHTML = "";
+  const crimes = station === "All" ? crimeData : crimeData.filter(c => c.Station === station);
+  const counts = {};
+  crimes.forEach(c => { counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; });
+  ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(crime => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${crime}</td><td>All</td><td><center>${counts[crime] || 0}</center></td>`;
+    crimeTbody.appendChild(tr);
+  });
+}
+
+function updateSummaryBox(data, station) {
+  const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
+  summaryBox.innerHTML = `<b>${station}</b><br>Total Personnel: ${total}`;
+}
+
+/* =========================== EXPORT =========================== */
+function exportToExcel() {
+  if (currentUser.role !== "admin") return;
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(allData.map(d => ({
+    Station: d.Station, Shift: d.Shift, Type: d["Deployment Type"],
+    Personnel: d.PersonnelList.map(p => p.name).join(", "),
+    Contact: d.PersonnelList[0]?.mobile || ""
+  })));
+  XLSX.utils.book_append_sheet(wb, ws, "Deployments");
+  XLSX.writeFile(wb, "NIDS_Export.xlsx");
+}
+
+async function exportToPDF() {
+  if (currentUser.role !== "admin") return;
+  const canvas = await html2canvas(document.getElementById('map'));
+  const img = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+  pdf.addImage(img, 'PNG', 10, 10, 190, 120);
+  pdf.text("NIDS Report", 10, 140);
+  pdf.save("NIDS_Report.pdf");
+}
+
+/* =========================== INIT =========================== */
 function initApp() {
   if (currentUser.role === "admin") {
     document.getElementById("adminControls").style.display = "block";
@@ -247,25 +390,13 @@ function initApp() {
     selectedStation = currentUser.station;
   }
   loadData();
+
+  stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
+  shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
+  typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
+  refreshBtn.onclick = loadData;
 }
 
-function loadData() {
-  showLoading(true);
-  // Simulate data load (replace with your full CSV fetch)
-  setTimeout(() => {
-    showLoading(false);
-    summaryBox.innerHTML = "Data loaded! Markers visible on map.";
-    // Add sample markers for testing
-    L.marker([9.3, 123.2]).addTo(map).bindPopup("Test Marker - Sibulan PS");
-    L.marker([9.31, 123.21]).addTo(map).bindPopup("Test Marker - Dumaguete CPS");
-  }, 1000);
-}
-
-/* Sample exports */
-function exportToExcel() { alert("Excel export - Admin only"); }
-function exportToPDF() { alert("PDF export - Admin only"); }
-
-refreshBtn.onclick = loadData;
 </script>
 </body>
 </html>
