@@ -71,9 +71,9 @@
 <script>
 // === ICONS ===
 const ICONS = {
-  "Beat Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Foot/Beat": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
@@ -139,7 +139,7 @@ function getCrimeIcon(crime){
              <i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i>
              <i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i>
            </span>`,
-    className: "", iconSize: [38,38], iconAnchor: [19,38]
+    className: "", iconSize: [24,24], iconAnchor: [15,24]
   });
 }
 
@@ -231,8 +231,7 @@ function applyFilters(){
     let icon = ICONS[iconKey] || ICONS["default"];
     let m = L.marker([d.lat,d.lng], {icon}).addTo(map);
     let mobileHtml = d.mobile ? `
-      <a href="tel:+63${d.mobile.slice(-10)}" style="color:#00bfff;margin-right:10px;">+63${d.mobile.slice(-10)}</a>
-      <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>
+      <a title="Contact Number" style="color:#00bfff;margin-right:10px;">+63${d.mobile.slice(-10)}</a> | <a title="Call using Viber" href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>
     ` : `<span style="color:#888;">No mobile</span>`;
     let photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
     m.bindPopup(`
