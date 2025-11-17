@@ -54,6 +54,10 @@
       margin-top:10px; 
       border:2px solid #444; 
     }
+    /* Side-by-side toggle buttons */
+    .toggle-container{display:flex;gap:8px;margin:12px 0;}
+    .toggle-btn{flex:1;background:#ff4444;color:white;padding:11px 8px;border-radius:8px;text-align:center;cursor:pointer;font-weight:bold;font-size:13px;min-height:42px;display:flex;align-items:center;justify-content:center;transition:all .3s;}
+    .toggle-btn.active{background:#44aa44;}
   </style>
 </head>
 <body>
@@ -71,8 +75,10 @@
     <h2>Deployment Type</h2>
     <select id="type" disabled><option value="All">All Types</option></select>
 
-    <div id="toggleDeployment" class="toggle-btn active">Hide Deployment Markers</div>
-    <div id="toggleCrimeMarkers" class="toggle-btn active">Hide Crime Markers</div>
+    <div class="toggle-container">
+      <div id="toggleDeployment" class="toggle-btn active">Hide Deployment Markers</div>
+      <div id="toggleCrimeMarkers" class="toggle-btn active">Hide Crime Markers</div>
+    </div>
 
     <h2>List of Personnel</h2>
     <div id="personnelContainer" class="table-container">
