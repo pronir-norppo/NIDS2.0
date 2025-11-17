@@ -270,7 +270,7 @@ function applyFilters(){
                   d.type.includes("Stationed")?"Stationed":"default";
       const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
       
-      // YOUR ORIGINAL POPUP HTML - 100% RESTORED
+      // POPUP HTML
       const mobileHtml = d.mobile ? `
         <a title="Contact Number" style="color:#00bfff;margin-right:10px;">+63${d.mobile.slice(-10)}</a> | 
         <a title="Call using Viber" href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>
@@ -318,7 +318,7 @@ function applyFilters(){
   renderCrimes();
 }
 
-function renderPersonnel(data){ /* your original working code */ 
+function renderPersonnel(data){ 
   const tbody = document.querySelector("#personnelTable tbody");
   tbody.innerHTML = "";
   const container = document.getElementById("personnelContainer");
@@ -334,7 +334,7 @@ function renderPersonnel(data){ /* your original working code */
   visible.forEach(p=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${esc(p.name)}</td>
-      <td>${p.mobile ? `<a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff">+63${p.mobile.slice(-10)}</a> <a href="viber://chat?number=%2B63${p.mobile.slice(-10)}" style="color:#7f4bff;margin-left:6px;">Viber</a>` : "—"}</td>
+      <td>${p.mobile ? `<a title="Call thru viber!" href="viber://chat?number=%2B63${p.mobile.slice(-10)}" style="color:#00bfff;margin-left:6px;">+63${p.mobile.slice(-10)}</a>` : "—"}</td>
       <td>${esc(p.callsign)}</td>`;
     tbody.appendChild(tr);
   });
