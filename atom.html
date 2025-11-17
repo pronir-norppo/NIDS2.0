@@ -2,460 +2,659 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS v2.0</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <title>NIDS v2.0 — New UI (Fixed)</title>
+  <!-- Leaflet & PapaParse -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="author" content="PSSg Leong, RAC - PIDMU, NOrPPO, PRO NIR" />
   <style>
-    :root{--bg:#121212; --panel:#1f1f1f; --accent:#00bfff; --gold:#ffcc00;}
-    *{margin:0;padding:0;box-sizing:border-box;}
-    html,body,#map,.main,.app{height:100vh;width:100vw;overflow:hidden;}
-    body{background:var(--bg);color:#eee;font-family:Arial,sans-serif;display:flex;}
-    .app{flex:1;display:flex;height:100vh;}
-    .sidebar{width:28%;background:var(--panel);padding:16px;overflow-y:auto;}
-    h1{font-size:16px;color:var(--gold);margin-bottom:12px;}
-    label{font-size:13px;color:#ddd;margin:10px 0 6px;display:block;}
-    select,button{width:100%;padding:10px;border-radius:6px;margin-bottom:10px;background:#2b2b2b;border:1px solid #333;color:#fff;font-size:14px;}
-    button{background:var(--accent);border:none;cursor:pointer;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    th,td{padding:8px 6px;border:1px solid #444;text-align:left;vertical-align:top;}
-    th{background:#2a2a2a;color:var(--gold);font-weight:bold;}
-    .main{flex:1;position:relative;}
-    #map{width:100%;height:100%;}
-    #summaryBox{
-      position:absolute; bottom:12px; left:12px; background:#000; color:yellow; 
-      padding:8px; border-radius:6px; font-size:12px; font-weight:500; 
-      z-index:1000; max-width:320px; max-height:180px; overflow:auto;
-    }
-    #loadingOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;}
-    #loadingOverlay.active{opacity:1;pointer-events:all;}
-    .spinner{width:50px;height:50px;border:6px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
+    /* --- NEW UI STYLE (from atom-i.html) --- */
+    :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
+    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
+    .app{display:flex;height:100vh}
+    .sidebar {width: 28%; padding: 16px; background: var(--panel); box-sizing: border-box; overflow-y: auto; scrollbar-width: none;}
+    .sidebar::-webkit-scrollbar {display: none;}
+    h1{margin:0 0 10px 0;color:var(--gold);font-size:16px}
+    h2{margin:0 0 10px 0;color:var(--gold);font-size:12px}
+    label{display:block;font-size:13px;color:#ddd;margin:10px 0 6px}
+    select{width:100%;padding:8px;border-radius:6px;background:#2b2b2b;border:1px solid #333;color:#fff}
+    button{margin-top:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
+    th{background:#2a2a2a;color:var(--gold);text-align:left}
+    .crime-row{cursor:default}
+    .crime-row.muted{opacity:0.35; pointer-events: none;}
+    .person-row{cursor:pointer}
+    .person-row.muted{opacity:0.45}
+    .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); color: #000; font-weight:600;}
+    #personnelTable td, #personnelTable th{font-size:11px;}
+    #crimeTable td, #personnelTable th{font-size:11px;}
+    .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
+    #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
+    #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.6); z-index:9999;pointer-events:none;opacity:0;transition:opacity .28s;}
+    #loadingOverlay.active{pointer-events:all;opacity:1}
+    .spinner{width:48px;height:48px;border-radius:50%;border:6px solid #222;border-top-color:var(--gold);animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .table-container{max-height:180px;overflow-y:auto;margin-bottom:8px;}
-    .toggle-link{color:var(--accent);font-size:13px;cursor:pointer;margin-top:4px;display:block;}
-    #loginModal{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#121212,#1a1a2e);display:flex;align-items:center;justify-content:center;z-index:10000;}
-    .login-box{background:#1f1f1f;padding:28px;border-radius:12px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;}
-    .login-box h2{color:var(--gold);text-align:center;margin-bottom:16px;font-size:18px;}
-    .login-box input{width:100%;padding:12px;margin:8px 0;border-radius:6px;background:#2b2b2b;border:1px solid #444;color:#fff;font-size:15px;}
-    .login-box button{width:100%;margin-top:16px;padding:12px;font-size:15px;}
-    #rememberMe{margin:8px 0;font-size:13px;color:#ddd;display:flex;align-items:center;}
-    #rememberMe input{width:auto;margin-right:8px;}
-    #logoutBtn{background:#ff4444;padding:6px 10px;font-size:12px;margin-left:8px;float:right;border-radius:4px;}
-    .export-btns{display:flex;gap:8px;margin-top:12px;}
-    .export-btns button{flex:1;font-size:12px;padding:10px;}
-    #stationOnly{display:none;margin:16px 0;padding:12px;background:#2a2a2a;border-radius:6px;text-align:center;font-size:14px;}
+    #summaryBox{ position:absolute; bottom:12px; left:12px; background:black; color:yellow; padding:6px; border-radius:4px; font-size:11px; font-weight:500; z-index:500; max-width:360px; max-height:260px; overflow:auto; opacity:0.95;}
+    #summaryBox table{border-collapse:collapse;}
+    #summaryBox td{padding:2px 6px; border:1px solid #555; font-size:11px;}
+    .leaflet-popup-content img {max-width:160px; max-height:160px; border-radius:6px; margin-top:6px; display:block !important; visibility:visible !important; opacity:1 !important;}
+    .table-container { max-height: 110px; overflow-y: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.3s ease; }
+    .table-container.expanded { max-height: 380px; overflow-y: auto; scrollbar-width: thin; }
+    .table-container.expanded::-webkit-scrollbar { width: 6px; }
+    .table-container.expanded::-webkit-scrollbar-track { background: #2a2a2a; }
+    .table-container.expanded::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+    .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 4px; display: inline-block; }
+    a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; margin-right:8px; }
+
+    /* POPUP: force block layout + wrapping for clearer lines */
+    .leaflet-popup-content { white-space: normal !important; word-break: break-word !important; }
+    .leaflet-popup-content-wrapper { max-width: 400px !important; }
+    .leaflet-popup-content.custom-popup { margin: 0; padding: 0; }
+    .popup-card { padding: 12px 14px; max-width: 380px; background:#1f1f1f; color:#eee; border-radius:12px; }
+    .popup-header h3 { margin:0; font-size:15px; color:#000; background: rgba(255,204,0,0.15); padding:4px 8px; border-radius:6px; display:inline-block }
+    .popup-callsign { font-size:12px; background: rgba(255,204,0,0.15); padding:2px 6px; border-radius:6px; }
+    .popup-person .person-name { font-weight:600; color:#9C2007; }
   </style>
 </head>
 <body>
-
-<div id="loginModal">
-  <div class="login-box">
-    <h2>NIDS Login</h2>
-    <input type="text" id="username" placeholder="Username" />
-    <input type="password" id="password" placeholder="Password" />
-    <label id="rememberMe"><input type="checkbox" id="rememberMeChk" /> Remember Me</label>
-    <button id="loginBtn">Login</button>
-    <div style="margin-top:10px;font-size:11px;color:#aaa;">
-      <b>Demo:</b><br>
-      <code>admin / admin123</code><br>
-      <code>sibulan / sibulan123</code><br>
-      <code>dumaguete / dgte123</code>
-    </div>
-  </div>
-</div>
-
-<div class="app" style="display:none">
-  <div class="sidebar">
-    <h1>NIDS 2.0 
-      <span id="userInfo" style="font-size:12px;color:#aaa;"></span>
-      <button id="refreshBtn">Refresh</button>
-      <button id="logoutBtn">Logout</button>
-    </h1>
-
-    <div id="adminControls" style="display:none;">
-      <label>Station</label>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <h1>NIDS 2.0 &nbsp;&nbsp;<button id="refreshBtn">Refresh</button></h1>
+      <label for="stationFilter">Station</label>
       <select id="stationFilter"><option value="All">All</option></select>
-      <label>Shift</label>
-      <select id="shiftFilter"><option value="All">All</option></select>
-      <label>Deployment Type</label>
-      <select id="typeFilter"><option value="All">All</option></select>
+      <label for="shiftFilter">Shift</label>
+      <select id="shiftFilter" disabled><option value="All">All</option></select>
+      <label for="typeFilter">Deployment Type</label>
+      <select id="typeFilter" disabled><option value="All">All</option></select>
+
+      <h2 style="margin-top:16px">Personnel</h2>
+      <div id="personnelContainer" class="table-container">
+        <table id="personnelTable">
+          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
+
+      <h2 style="margin-top:20px">8 Focus Crimes</h2>
+      <table id="crimeTable"><thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead><tbody></tbody></table>
     </div>
 
-    <div id="stationOnly">
-      <strong id="lockedStation"></strong><br>
-      <small style="color:#aaa;">Current shift only</small>
-    </div>
-
-    <h2 style="margin-top:16px">Personnel</h2>
-    <div id="personnelContainer" class="table-container">
-      <table id="personnelTable">
-        <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
-
-    <h2 style="margin-top:20px">8 Focus Crimes</h2>
-    <table id="crimeTable">
-      <thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead>
-      <tbody></tbody>
-    </table>
-
-    <div id="exportButtons" class="export-btns" style="display:none;">
-      <button onclick="exportToExcel()">Export Excel</button>
-      <button onclick="exportToPDF()">Export PDF</button>
+    <div class="main">
+      <div id="map">
+        <div id="summaryBox">Summary...</div>
+      </div>
     </div>
   </div>
 
-  <div class="main">
-    <div id="map"></div>
-    <div id="summaryBox">Loading...</div>
-  </div>
-</div>
-
-<div id="loadingOverlay"><div class="spinner"></div></div>
+  <div id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-/* =========================== ICONS (PRE-LOAD + FALLBACK) =========================== */
+/* ===========================
+   CONFIG / CONSTANTS
+   =========================== */
+const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+const PLACEHOLDER_IMG = "https://via.placeholder.com/160x90.png";
+const FALLBACK_TEST_IMAGE = "https://via.placeholder.com/160x90.png";
+const STATIC_TEST_IMAGE = "data:image/png;base64,iVBORw0K..."; // (full base64 in file)
+const FOCUS_CRIMES = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
+const defaultCenter = [9.3, 123.2];
+const defaultZoom = 9;
+const FALLBACK_COORDS = { lat: 9.3, lng: 123.2 };
+
 const ICONS = {
-  "Foot/Beat": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Motorcycle": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
-  "Mobile": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Beat Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile Patrol": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
   "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
 };
+const FALLBACK_ICON = L.icon({ iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png", iconSize: [25, 41], iconAnchor: [12, 41] });
 
-/* Preload icons */
-Object.values(ICONS).forEach(icon => {
-  const img = new Image();
-  img.src = icon.options.iconUrl;
-});
-
-/* =========================== USERS =========================== */
-const USERS = {
-  "admin": { pass: "admin123", role: "admin" },
-  "sibulan": { pass: "sibulan123", role: "station", station: "Sibulan PS" },
-  "dumaguete": { pass: "dgte123", role: "station", station: "Dumaguete CPS" }
-};
-
-let currentUser = null;
-let allData = [], crimeData = [];
-let markerCluster = null;
-let selectedStation = "All", selectedShift = "All", selectedType = "All";
+/* ===========================
+   STATE & DOM REFERENCES
+   =========================== */
+let allData = [];
+let crimeData = [];
+let displayedMarkers = [];
+let highlightLayer = null;
+let selectedRowEl = null;
 let personnelExpanded = false;
+const imageCache = new Map();
 
-/* DOM */
 const stationSelect = document.getElementById("stationFilter");
 const shiftSelect = document.getElementById("shiftFilter");
 const typeSelect = document.getElementById("typeFilter");
-const personnelTbody = document.querySelector("#personnelTable tbody");
 const crimeTbody = document.querySelector("#crimeTable tbody");
-const loadingOverlay = document.getElementById("loadingOverlay");
+const personnelTbody= document.querySelector("#personnelTable tbody");
+const loadingOverlay= document.getElementById("loadingOverlay");
 const summaryBox = document.getElementById("summaryBox");
 const toggleLink = document.getElementById("togglePersonnel");
 const refreshBtn = document.getElementById("refreshBtn");
 
-/* =========================== MAP =========================== */
-const map = L.map('map', { zoomControl: true }).setView([9.3, 123.2], 10);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-markerCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
-map.addLayer(markerCluster);
+/* ===========================
+   MAP INITIALIZATION
+   =========================== */
+const map = L.map('map').setView(defaultCenter, defaultZoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; PICTMU, NOrPPO, PRO NIR' }).addTo(map);
 
-/* =========================== ROBUST FIELD PARSER =========================== */
+/* ===========================
+   HELPERS (robust parsing)
+   =========================== */
+function normalize(s){ return s ? String(s).trim().toLowerCase() : ""; }
+function showLoading(on){ loadingOverlay.classList.toggle("active", !!on); }
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
 function getField(row, ...keys) {
-  if (!row) return "";
-  for (const key of keys) {
-    let val = row[key];
-    if (val !== undefined && val !== null) {
-      val = String(val).trim();
-      if (val !== "") return val;
+  if(!row) return "";
+  for (const k of keys) {
+    if (k in row && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+  }
+  const actualKeys = Object.keys(row);
+  for (const k of keys) {
+    const target = String(k || "").trim().toLowerCase();
+    for (const a of actualKeys) {
+      if (String(a).trim().toLowerCase() === target) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
+    }
+  }
+  for (const a of actualKeys) {
+    const ak = String(a).toLowerCase();
+    for (const k of keys) {
+      if (ak.indexOf(String(k || "").trim().toLowerCase()) !== -1) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== "") return row[a];
+      }
     }
   }
   return "";
 }
 
-/* =========================== LAT/LNG PARSER (ANY FORMAT) =========================== */
-function parseLatLngFromRow(r) {
-  const latField = getField(r, "Latitude, Longitude", "Lat_Long", "Latitude", "Lat", "Lat Long");
-  if (!latField) return null;
-  const cleaned = latField.replace(/[^\d.,-]/g, '');
-  const parts = cleaned.split(',').map(p => parseFloat(p.trim())).filter(n => !isNaN(n));
-  if (parts.length >= 2) return { lat: parts[0], lng: parts[1] };
-  return null;
-}
-
-/* =========================== STATION MATCH =========================== */
-function matchesStation(sheetName, userStation) {
-  if (!sheetName || !userStation) return false;
-  const clean = str => str.toLowerCase().replace(/[^\w]/g, '');
-  const s1 = clean(sheetName);
-  const s2 = clean(userStation);
-  return s1.includes(s2) || s2.includes(s1);
-}
-
-/* =========================== ICON LOOKUP =========================== */
-function getIcon(type) {
-  const cleanType = type.trim();
-  return ICONS[cleanType] || ICONS["default"];
-}
-
-/* =========================== DATA LOAD =========================== */
-const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
-const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
-
-async function loadData() {
-  showLoading(true);
+function parseLatLngFromRow(r){
   try {
-    const cacheKey = 'nids_data_final';
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      const { data, crime, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 5 * 60 * 1000) {
-        allData = data; crimeData = crime;
-        refreshUI(); applyFilters();
-        showLoading(false);
-        return;
+    const tryVals = (keys) => {
+      for(const k of keys){
+        if(r[k] !== undefined && r[k] !== null && String(r[k]).trim()!=="") return String(r[k]).trim();
+      }
+      return "";
+    };
+    let combined = tryVals([
+      "Latitude, Longitude: (e.g 9.336661, 123.305993) Note: Provide coordinates only in a high-precision DD format, using many decimal places. ",
+      "Latitude, Longitude", "Lat_Long", "Lat_Long (e.g. 9.33805856, 123.3007679)", "LatLong", "Lat / Long", "latlong", "Lat/Long", "Coordinates", "coords", "Location"
+    ]);
+    if(!combined) combined = getField(r, "Lat_Long", "LatLong", "Coordinates", "coords", "Location");
+    let latVal = tryVals(["Lat","Latitude","lat","latitude","LAT","Y"]);
+    let lngVal = tryVals(["Lng","Long","Longitude","lng","long","longitude","LON","Lon","X"]);
+    if(combined){
+      const parts = combined.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
+      if(parts.length >= 2){
+        const a = parseFloat(parts[0].replace(/[^\d\.\-]/g,'')), b = parseFloat(parts[1].replace(/[^\d\.\-]/g,'')); 
+        if(!isNaN(a) && !isNaN(b)) return { lat: +a, lng: +b };
       }
     }
+    if(latVal && latVal.indexOf(",") !== -1 && (!lngVal)){
+      const ps = latVal.split(/[,;\/\s()]+/).map(p=>p.trim()).filter(Boolean);
+      if(ps.length>=2){
+        const a = parseFloat(ps[0]), b = parseFloat(ps[1]);
+        if(!isNaN(a) && !isNaN(b)) { latVal = ps[0]; lngVal = ps[1]; }
+      }
+    }
+    let lat = latVal ? parseFloat(latVal.replace(/[^\d\.\-]/g,'')) : NaN;
+    let lng = lngVal ? parseFloat(lngVal.replace(/[^\d\.\-]/g,'')) : NaN;
+    function inPHLat(v){ return !isNaN(v) && v >= 4 && v <= 22; }
+    function inPHLng(v){ return !isNaN(v) && ( (v >= 116 && v <= 127) || (v <= -116 && v >= -127) ); }
+    if(!isNaN(lat) && !isNaN(lng)){
+      if(!inPHLat(lat) && inPHLat(lng) && !inPHLng(lng) && inPHLng(lat)){
+        const tmp = lat; lat = lng; lng = tmp;
+      }
+    }
+    if(isNaN(lat) || isNaN(lng)) return FALLBACK_COORDS;
+    return { lat: +lat, lng: +lng };
+  } catch(err) {
+    console.error("[PARSE LATLNG] Error for row:", r, err);
+    return FALLBACK_COORDS;
+  }
+}
 
-    const [depText, crimeText] = await Promise.all([
-      fetch(DEPLOYMENT_SHEET_CSV).then(r => r.text()),
-      fetch(CRIME_SHEET_CSV).then(r => r.text())
-    ]);
+function escapeHtml(s){ return (s||"").toString().replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
 
-    const dep = Papa.parse(depText, { header: true, skipEmptyLines: true }).data;
-    const crime = Papa.parse(crimeText, { header: true, skipEmptyLines: true }).data;
+function makeContactLinks(mobile){
+  const cleaned = (mobile||"").toString().replace(/\s+/g,'');
+  if(!cleaned) return '';
+  let plusNum = cleaned;
+  if(/^0\d+/.test(cleaned)) plusNum = "+63" + cleaned.slice(1);
+  if(/^\d{10,}$/.test(cleaned) && !/^\+/.test(plusNum)) plusNum = "+" + plusNum;
+  const vlink = `viber://chat?number=${encodeURIComponent(plusNum)}`;
+  const tel = `tel:${plusNum}`;
+  return `<a class="viber-link" href="${vlink}" title="Open Viber">${escapeHtml(plusNum)}</a> <a href="${tel}" title="Call"></a>`;
+}
 
-    allData = dep.map(r => {
-      const coords = parseLatLngFromRow(r);
-      if (!coords) return null;
-      const personnelStr = getField(r, "Personnel", "Personnel: (e.g. Rank FName MI LName)", "Personnel List");
-      const personnel = personnelStr ? personnelStr.split(/[,;]/).map(p => p.trim()).filter(Boolean) : [];
-      const type = getField(r, "Types Deployment", "Deployment Type", "Type") || "default";
-      const station = getField(r, "Station/Unit", "Station", "Unit") || "Unknown";
-      return {
-        Station: station,
-        Shift: getField(r, "Duty Shift", "Duty Shift:", "Shift") || "Unspecified",
-        "Deployment Type": type,
-        CallSign: getField(r, "Call Sign", "Call Sign:") || "",
-        Location: getField(r, "Deployment Area", "Location", "Area") || "",
-        Photo: getImageUrl(getField(r, "Picture with Timestamp", "Picture", "Photo")),
-        PersonnelList: personnel.map((n, i) => ({ 
-          name: n, 
-          mobile: i === 0 ? getField(r, "Contact Number", "Contact Number:", "Mobile") : "" 
-        })),
-        Lat: coords.lat, Lng: coords.lng,
-        Icon: getIcon(type)
+/* ===========================
+   CSV FETCH
+   =========================== */
+function fetchCsv(url){
+  return fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {cache: "no-store"})
+    .then(r => {
+      if(!r.ok) throw new Error("Network response not ok: " + r.status);
+      return r.text();
+    })
+    .then(text => Papa.parse(text, { header: true, skipEmptyLines: true }).data)
+    .catch(err => { console.error("[FETCH CSV] Error fetching:", url, err); throw err; });
+}
+
+/* ===========================
+   LOAD & NORMALIZE DATA
+   =========================== */
+async function loadData(){
+  showLoading(true);
+  try{
+    const [depRows, crimeRows] = await Promise.all([ fetchCsv(DEPLOYMENT_SHEET_CSV), fetchCsv(CRIME_SHEET_CSV) ]);
+
+    allData = depRows.map((r, idx) => {
+      const { lat, lng } = parseLatLngFromRow(r);
+
+      const personnelFieldValue = getField(r,
+        "Personnel: (e.g. Rank FName MI LName) Note: Put a comma after each item if you list more than one. ",
+        "Personnel (Rank_FName_MI_LName)", "Personnel (Rank_FName_MI_LName (Contact#) ", "Personnel (Rank_FName_MI_LName (Contact#)", "Personnel", "Personnel (Rank_FName_MI_LName (Contact#) "
+      );
+      const personnelRaw = (personnelFieldValue || "").toString();
+      const rawPersonnel = [];
+      if (personnelRaw) {
+        personnelRaw.split(",").map(p=>p.trim()).filter(Boolean).forEach(entry => {
+          rawPersonnel.push({ name: entry, mobile: "" });
+        });
+      }
+      const contactFieldValue = getField(r, "Contact Number: Note: Only the number of the team leader (or most senior member) is required. ", "Contact Number", "Mobile", "Mobile No", "Mobile#");
+      const contact = (contactFieldValue || "").toString().trim();
+      if (contact && rawPersonnel.length > 0) rawPersonnel[0].mobile = contact;
+
+      const rowData = {
+        raw: r,
+        Station: getField(r, "Station/Unit", "Station -", "Station") || "Unknown",
+        Shift: getField(r, "Duty Shift:", "Shift") || "Unspecified",
+        "Deployment Type": getField(r, "Types Deployment:", "Deployment Type", "DeploymentType") || "Unspecified",
+        Name: getField(r, "Name (Rank FName MI LName)", "Name") || (rawPersonnel.length > 0 ? rawPersonnel[0].name : "Unnamed"),
+        CallSign: getField(r, "Call Sign:", "Call Sign", "CallSign") || "",
+        Location: getField(r, "Deployment Area", "Location", "Location/Barangay") || "",
+        Photo: getImageUrl(getField(r, "Picture with Timestamp:", "Picture with timestamp", "Photo", "Picture")),
+        PersonnelList: rawPersonnel,
+        Lat: lat,
+        Lng: lng
       };
-    }).filter(Boolean);
+      return rowData;
+    }).filter(d => d.Station !== "Unknown" || d.PersonnelList.length > 0);
 
-    crimeData = crime.map(r => ({
+    crimeData = crimeRows.map(r => ({
       Station: getField(r, "Station") || "Unknown",
       "Focus Crimes": getField(r, "Focus Crimes", "Crime") || "",
-      Barangay: getField(r, "Barangay") || "Unknown"
+      Barangay: getField(r, "Barangay") || ""
     }));
 
-    localStorage.setItem(cacheKey, JSON.stringify({ data: allData, crime: crimeData, timestamp: Date.now() }));
-    refreshUI(); applyFilters();
-  } catch (e) {
-    summaryBox.innerHTML = "Error loading data. Using cache.";
-    console.error(e);
+    refreshUI();
+  } catch(err){
+    console.error("[LOAD] Error loading CSVs or parsing data:", err);
   } finally {
     showLoading(false);
   }
 }
 
-function getImageUrl(url) {
-  if (!url) return "";
-  const match = url.match(/id=([^&]+)/);
-  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w240` : "";
+/* ===========================
+   REFRESH UI
+   =========================== */
+function refreshUI(){
+  try {
+    const stationSet = [...new Set(allData.map(d => d.Station).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    stationSelect.innerHTML = "<option value='All'>All</option>" + stationSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+
+    const allShifts = [...new Set(allData.map(d => d.Shift).filter(Boolean))].sort();
+    shiftSelect.innerHTML = "<option value='All'>All</option>" + allShifts.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+    shiftSelect.disabled = true;
+
+    typeSelect.innerHTML = "<option value='All'>All</option>"; typeSelect.disabled = true;
+
+    selectedStation = "All"; selectedShift = "All"; selectedType = "All";
+    displayedMarkers.forEach(m => { try{ map.removeLayer(m.marker); } catch(e){} });
+    displayedMarkers = [];
+
+    applyFilters();
+  } catch(err) {
+    console.error("[REFRESH UI] Error:", err);
+  }
 }
 
-function showLoading(on) { loadingOverlay.classList.toggle("active", on); }
+/* ===========================
+   APPLY FILTERS
+   =========================== */
+let selectedStation = "All", selectedShift = "All", selectedType = "All";
 
-/* =========================== UI POPULATE =========================== */
-function refreshUI() {
-  const stations = [...new Set(allData.map(d => d.Station))].sort();
-  stationSelect.innerHTML = "<option value='All'>All</option>" + stations.map(s => `<option>${s}</option>`).join("");
+function applyFilters(){
+  try {
+    showLoading(true);
+    const filtered = allData.filter(d =>
+      (selectedStation === "All" || normalize(d.Station) === normalize(selectedStation)) &&
+      (selectedShift   === "All" || normalize(d.Shift)   === normalize(selectedShift)) &&
+      (selectedType    === "All" || normalize(d["Deployment Type"]) === normalize(selectedType))
+    );
 
-  const shifts = [...new Set(allData.map(d => d.Shift))].sort();
-  shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s => `<option>${s}</option>`).join("");
+    displayedMarkers.forEach(mset => { try{ map.removeLayer(mset.marker); } catch(e){} });
+    displayedMarkers = [];
 
-  const types = [...new Set(allData.map(d => d["Deployment Type"]))].sort();
-  typeSelect.innerHTML = "<option value='All'>All</option>" + types.map(t => `<option>${t}</option>`).join("");
+    const bounds = [];
+    filtered.forEach((r, idx) => {
+      const lat = r.Lat != null ? r.Lat : FALLBACK_COORDS.lat;
+      const lng = r.Lng != null ? r.Lng : FALLBACK_COORDS.lng;
+      const photoUrl = r.Photo || FALLBACK_TEST_IMAGE;
+      const imgSrc = imageCache.get(photoUrl) || photoUrl;
 
-  markerCluster.clearLayers();
+      const popupDiv = document.createElement('div');
+      popupDiv.className = 'popup-card';
+
+      const header = document.createElement('div');
+      header.className = 'popup-header';
+      const h3 = document.createElement('h3');
+      h3.textContent = r.Station || 'Unknown Unit';
+      header.appendChild(h3);
+      popupDiv.appendChild(header);
+
+      if (r.Location) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Patrol Area:</b> ${escapeHtml(r.Location)}`;
+        popupDiv.appendChild(row);
+      }
+      if (r.Shift) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Shift:</b> ${escapeHtml(r.Shift)}`;
+        popupDiv.appendChild(row);
+      }
+      if (r["Deployment Type"]) {
+        const row = document.createElement('div');
+        row.className = 'popup-row';
+        row.innerHTML = `<b>Deployment:</b> ${escapeHtml(r["Deployment Type"])}`;
+        popupDiv.appendChild(row);
+      }
+      if (r.CallSign) {
+        const callsign = document.createElement('span');
+        callsign.className = 'popup-callsign';
+        callsign.innerHTML = `<b>Callsign</b>: ${escapeHtml(r.CallSign)}`;
+        popupDiv.appendChild(callsign);
+      }
+      const hr = document.createElement('hr');
+      popupDiv.appendChild(hr);
+
+      const peopleDiv = document.createElement('div');
+      peopleDiv.className = 'popup-people';
+      if (Array.isArray(r.PersonnelList) && r.PersonnelList.length) {
+        r.PersonnelList.forEach((p, idx) => {
+          const personDiv = document.createElement('div');
+          personDiv.className = 'popup-person';
+          const name = p.name || r.Name || ("Person " + (idx+1));
+          const mobile = p.mobile || "";
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'person-name';
+          nameSpan.textContent = name;
+          personDiv.appendChild(nameSpan);
+          personDiv.appendChild(document.createElement('br'));
+          personDiv.innerHTML += mobile ? makeContactLinks(mobile) : `<span style="opacity:0.6">no mobile</span>`;
+          peopleDiv.appendChild(personDiv);
+        });
+      } else {
+        const personDiv = document.createElement('div');
+        personDiv.className = 'popup-person';
+        personDiv.innerHTML = `<strong>${escapeHtml(r.Name || "Unnamed")}</strong>`;
+        peopleDiv.appendChild(personDiv);
+      }
+      popupDiv.appendChild(peopleDiv);
+
+      const photoDiv = document.createElement('div');
+      photoDiv.className = 'popup-photo loading';
+      const img = document.createElement('img');
+      img.src = imgSrc;
+      img.alt = 'photo';
+      img.width = 250;
+      img.height = 120;
+      img.onload = () => { photoDiv.classList.remove('loading'); };
+      img.onerror = () => { img.src = STATIC_TEST_IMAGE; img.width = 250; img.height = 120; photoDiv.classList.remove('loading'); };
+      photoDiv.appendChild(img);
+      popupDiv.appendChild(photoDiv);
+
+      const deploymentType = r["Deployment Type"] || "default";
+      let icon = ICONS[deploymentType] || ICONS["default"];
+      const iconImg = new Image();
+      iconImg.src = icon.options.iconUrl;
+      iconImg.onload = () => {};
+      iconImg.onerror = () => { icon = FALLBACK_ICON; };
+
+      const marker = L.marker([lat, lng], { icon });
+      marker.bindPopup(popupDiv, { maxWidth: 400, minWidth: 250, className: "custom-popup", autoClose: false, keepInView: true });
+      marker.addTo(map);
+      displayedMarkers.push({ marker, deployment: r });
+      bounds.push([lat, lng]);
+    });
+
+    if(bounds.length){
+      if (selectedStation !== "All") {
+        const b = L.latLngBounds(bounds);
+        map.fitBounds(b.pad(0.2));
+      } else {
+        map.setView(defaultCenter, defaultZoom);
+      }
+    } else {
+      map.setView(defaultCenter, defaultZoom);
+    }
+
+    renderPersonnelTable(filtered);
+    renderCrimeTable();
+    updateSummaryBox(filtered);
+    showLoading(false);
+  } catch(err) {
+    console.error("[FILTER] Error applying filters:", err);
+    showLoading(false);
+  }
 }
 
-/* =========================== FILTERS =========================== */
-function applyFilters() {
-  const isStation = currentUser.role === "station";
-  const stationFilter = isStation ? currentUser.station : selectedStation;
-
-  const filtered = allData.filter(d => {
-    const stationMatch = stationFilter === "All" || matchesStation(d.Station, stationFilter);
-    const shiftMatch = selectedShift === "All" || d.Shift === selectedShift;
-    const typeMatch = selectedType === "All" || d["Deployment Type"] === selectedType;
-    return stationMatch && shiftMatch && typeMatch;
-  });
-
-  markerCluster.clearLayers();
-  const bounds = [];
-
-  filtered.forEach(r => {
-    const marker = L.marker([r.Lat, r.Lng], { icon: r.Icon });
-    const popup = `
-      <div style="max-width:280px;font-size:13px;">
-        <h3 style="margin:0 0 4px;background:rgba(255,204,0,0.15);padding:4px;color:#000;font-size:14px;">${r.Station}</h3>
-        <b>Area:</b> ${r.Location}<br>
-        <b>Shift:</b> ${r.Shift}<br>
-        <b>Type:</b> ${r["Deployment Type"]}<br>
-        <b>Callsign:</b> ${r.CallSign}<br>
-        ${r.PersonnelList.map(p => `<div style="margin:4px 0;"><b>${p.name}</b><br>${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</div>`).join("")}
-        ${r.Photo ? `<img src="${r.Photo}" style="max-width:100%;margin-top:6px;border-radius:4px;" loading="lazy">` : ''}
-      </div>`;
-    marker.bindPopup(popup, { maxWidth: 300 });
-    markerCluster.addLayer(marker);
-    bounds.push([r.Lat, r.Lng]);
-  });
-
-  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
-  else map.setView([9.3, 123.2], 10);
-
-  renderPersonnelTable(filtered);
-  renderCrimeTable(isStation ? currentUser.station : stationFilter);
-  updateSummaryBox(filtered, isStation ? currentUser.station : stationFilter);
-}
-
-/* =========================== TABLES =========================== */
-function renderPersonnelTable(data) {
+/* ===========================
+   RENDER PERSONNEL
+   =========================== */
+function renderPersonnelTable(filteredDeployments){
   personnelTbody.innerHTML = "";
-  const rows = data.flatMap(d => 
-    d.PersonnelList.length > 0 
-      ? d.PersonnelList.map(p => ({ ...p, Station: d.Station, CallSign: d.CallSign }))
-      : [{ name: "No personnel", mobile: "", Station: d.Station, CallSign: d.CallSign }]
-  );
-  const visible = personnelExpanded ? rows : rows.slice(0, 8);
-  visible.forEach(p => {
+  if (!selectedStation || selectedStation === "All") {
+    personnelTbody.innerHTML = `<tr><td colspan="4" style="padding:8px; color:#aaa; font-style:italic; text-align:center;">Please select a station to show personnel list here</td></tr>`;
+    toggleLink.style.display = "none";
+    return;
+  }
+  const personRows = [];
+  filteredDeployments.forEach(dep => {
+    if(Array.isArray(dep.PersonnelList) && dep.PersonnelList.length){
+      const combinedNames = dep.PersonnelList.map(p => p.name || "").filter(Boolean).join(", ");
+      const firstMobile = (dep.PersonnelList.find(p => p.mobile) || {}).mobile || "";
+      personRows.push({ name: combinedNames || dep.Name || "Unnamed", mobile: firstMobile, CallSign: dep.CallSign || "", Station: dep.Station || "Unknown", lat: dep.Lat, lng: dep.Lng, deployment: dep });
+    } else {
+      personRows.push({ name: dep.Name || "Unnamed", mobile: (dep.raw && (dep.raw.Mobile || dep.raw["Mobile No"] || dep.raw["Mobile#"])) || "", CallSign: dep.CallSign || "", Station: dep.Station || "Unknown", lat: dep.Lat, lng: dep.Lng, deployment: dep });
+    }
+  });
+  if(personRows.length === 0){
+    personnelTbody.innerHTML = "<tr><td colspan='4'>No personnel</td></tr>";
+    toggleLink.style.display = "none";
+    return;
+  }
+  const visible = personnelExpanded ? personRows : personRows.slice(0, 5);
+  const handleRowClick = debounce((p, tr, ev) => {
+    if (selectedRowEl) selectedRowEl.classList.remove("selected");
+    tr.className = "person-row selected";
+    selectedRowEl = tr;
+    const match = displayedMarkers.find(m => m.deployment === p.deployment);
+    if (match) {
+      map.flyTo(match.marker.getLatLng(), 15, { animate: true, duration: 0.3 });
+      match.marker.openPopup();
+      addHighlight([match.deployment.Lat || FALLBACK_COORDS.lat, match.deployment.Lng || FALLBACK_COORDS.lng]);
+    }
+  }, 300);
+  visible.forEach((p, idx) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td style="font-size:13px;">${p.name}</td>
-                    <td style="font-size:12px;">${p.mobile ? `<a href="tel:${p.mobile}" style="color:#00bfff;">${p.mobile}</a>` : ''}</td>
-                    <td style="font-size:12px;">${p.CallSign}</td>
-                    <td style="font-size:11px;">${p.Station}</td>`;
+    tr.className = "person-row";
+    const mobileCell = p.mobile ? `<td>${makeContactLinks(p.mobile)}</td>` : `<td><span style="opacity:0.6">no mobile</span></td>`;
+    tr.innerHTML = `<td>${escapeHtml(p.name)}</td>${mobileCell}<td>${escapeHtml(p.CallSign)}</td><td>${escapeHtml(p.Station)}</td>`;
+    tr.onclick = ev => handleRowClick(p, tr, ev);
     personnelTbody.appendChild(tr);
   });
-  toggleLink.style.display = rows.length > 8 ? "inline-block" : "none";
-  toggleLink.onclick = () => { personnelExpanded = !personnelExpanded; applyFilters(); };
-  toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${rows.length})`;
+  toggleLink.style.display = personRows.length > 5 ? "inline-block" : "none";
+  toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${personRows.length})`;
 }
 
-function renderCrimeTable(station) {
+/* ===========================
+   RENDER CRIME TABLE (restored)
+   =========================== */
+function renderCrimeTable(){
   crimeTbody.innerHTML = "";
-  const crimes = station === "All" ? crimeData : crimeData.filter(c => matchesStation(c.Station, station));
-  const counts = {};
-  crimes.forEach(c => { counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1; });
-
-  const focusCrimes = ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"];
-  focusCrimes.forEach(crime => {
-    const count = counts[crime] || 0;
-    const barangays = [...new Set(crimes.filter(c => c["Focus Crimes"] === crime).map(c => c.Barangay))];
-    const brgyText = station === "All" ? "All" : (barangays.length > 0 ? barangays.join(", ") : "None");
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td style="font-size:13px;">${crime}</td>
-                    <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${brgyText}">${brgyText}</td>
-                    <td style="text-align:center;font-weight:bold;">${count}</td>`;
-    crimeTbody.appendChild(tr);
-  });
+  try {
+    if(!crimeData || !crimeData.length){
+      crimeTbody.innerHTML = "<tr><td colspan=3>No crime data</td></tr>";
+      return;
+    }
+    const station = stationSelect.value;
+    if(station === "All"){
+      const validStations = new Set(allData.map(d => d.Station));
+      const counts = {};
+      crimeData.forEach(c => {
+        if(c["Focus Crimes"] && validStations.has(c.Station)){
+          counts[c["Focus Crimes"]] = (counts[c["Focus Crimes"]] || 0) + 1;
+        }
+      });
+      FOCUS_CRIMES.forEach(cr => {
+        const cnt = counts[cr] || 0;
+        const tr = document.createElement("tr");
+        tr.className = "crime-row" + (cnt===0 ? " muted" : "");
+        tr.innerHTML = `<td>${escapeHtml(cr)}</td><td>(all barangays)</td><td><center>${cnt}</center></td>`;
+        crimeTbody.appendChild(tr);
+      });
+    } else {
+      const normalized = normalize(station);
+      const stationCrimes = crimeData.filter(c => normalize(c.Station) === normalized);
+      if(!stationCrimes.length){
+        crimeTbody.innerHTML = "<tr><td colspan=3>No crimes for this station</td></tr>";
+        return;
+      }
+      const counts = {};
+      stationCrimes.forEach(c => {
+        const crimeName = c["Focus Crimes"] || c.Crime || "(unknown)";
+        const brgy = c.Barangay || "(unknown)";
+        const key = crimeName + "|" + brgy;
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      Object.entries(counts).forEach(([key, cnt])=>{
+        const [crimeName, brgy] = key.split("|");
+        const tr = document.createElement("tr");
+        tr.className = "crime-row";
+        tr.innerHTML = `<td>${escapeHtml(crimeName)}</td><td>${escapeHtml(brgy)}</td><td><center>${cnt}</center></td>`;
+        crimeTbody.appendChild(tr);
+      });
+    }
+  } catch(err) {
+    console.error("[RENDER CRIME] Error:", err);
+    crimeTbody.innerHTML = "<tr><td colspan=3>Error rendering crime data</td></tr>";
+  }
 }
 
-function updateSummaryBox(data, station) {
-  const total = data.reduce((a, d) => a + d.PersonnelList.length, 0);
-  summaryBox.innerHTML = `<b style="font-size:14px;">${station}</b><br>Personnel: <b>${total}</b><br>Shift: <b>${selectedShift}</b>`;
+/* ===========================
+   SUMMARY BOX (restored)
+   =========================== */
+function updateSummaryBox(filteredRows){
+  try {
+    if(!filteredRows) filteredRows = [];
+    if(filteredRows.length === 0){
+      summaryBox.innerHTML = "No personnel";
+      return;
+    }
+    if(stationSelect.value === "All"){
+      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
+      summaryBox.innerHTML = `<b>Total Personnel:</b> ${totalPersonnel}`;
+    } else {
+      const totalPersonnel = filteredRows.reduce((acc,r) => acc + (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList ? 1 : 0)), 0);
+      const groups = {};
+      filteredRows.forEach(r=>{
+        const key = (r.Shift||"") + "||" + (r["Deployment Type"]||"");
+        groups[key] = groups[key] || { shift: r.Shift||"", type: r["Deployment Type"]||"", count:0 };
+        groups[key].count += (Array.isArray(r.PersonnelList) ? r.PersonnelList.length : (r.PersonnelList?1:0));
+      });
+      let rowsHtml = Object.values(groups).map(g => `<tr><td>${escapeHtml(g.shift)}</td><td>${escapeHtml(g.type)}</td><td>${g.count}</td></tr>`).join("");
+      if(!rowsHtml) rowsHtml = `<tr><td colspan=3>No deployment details</td></tr>`;
+      summaryBox.innerHTML = `<b>${escapeHtml(stationSelect.value)}</b><br>Total Personnel: ${totalPersonnel}<br><table><tr><td>Shift</td><td>Type</td><td>Count</td></tr>${rowsHtml}</table>`;
+    }
+  } catch(err) {
+    console.error("[UPDATE SUMMARY] Error:", err);
+    summaryBox.innerHTML = "Summary error";
+  }
 }
 
-/* =========================== EXPORT =========================== */
-function exportToExcel() {
-  if (currentUser.role !== "admin") return;
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(allData.map(d => ({
-    Station: d.Station, Shift: d.Shift, Type: d["Deployment Type"],
-    Personnel: d.PersonnelList.map(p => p.name).join(", "),
-    Contact: d.PersonnelList[0]?.mobile || ""
-  })));
-  XLSX.utils.book_append_sheet(wb, ws, "Deployments");
-  XLSX.writeFile(wb, "NIDS_Export.xlsx");
-}
-
-async function exportToPDF() {
-  if (currentUser.role !== "admin") return;
-  const canvas = await html2canvas(document.getElementById('map'), { scale: 1.5 });
-  const img = canvas.toDataURL('image/png');
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('l', 'mm', 'a4');
-  pdf.addImage(img, 'PNG', 10, 10, 270, 180);
-  pdf.text("NIDS Report", 10, 200);
-  pdf.save("NIDS_Report.pdf");
-}
-
-/* =========================== LOGIN & INIT =========================== */
-document.getElementById("loginBtn").onclick = () => {
-  const u = document.getElementById("username").value.trim().toLowerCase();
-  const p = document.getElementById("password").value;
-  const chk = document.getElementById("rememberMeChk").checked;
-  if (USERS[u] && USERS[u].pass === p) {
-    currentUser = USERS[u];
-    document.getElementById("loginModal").remove();
-    document.querySelector(".app").style.display = "flex";
-    document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-    document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
-    if (chk) localStorage.setItem('nids_user', JSON.stringify(currentUser));
-    setTimeout(() => {
-      map.invalidateSize();
-      initApp();
-    }, 100);
-  } else alert("Invalid credentials");
+/* ===========================
+   FILTER EVENT HANDLERS
+   =========================== */
+stationSelect.onchange = function(){
+  selectedStation = stationSelect.value;
+  selectedShift = "All"; selectedType = "All";
+  if(selectedStation === "All"){
+    shiftSelect.innerHTML = "<option value='All'>All</option>"; shiftSelect.disabled = true;
+    typeSelect.innerHTML = "<option value='All'>All</option>"; typeSelect.disabled = true;
+  } else {
+    const stationRows = allData.filter(d => normalize(d.Station) === normalize(selectedStation));
+    const shifts = [...new Set(stationRows.map(r => r.Shift || "Unspecified"))];
+    const types  = [...new Set(stationRows.map(r => r["Deployment Type"] || "Unspecified"))];
+    shiftSelect.innerHTML = "<option value='All'>All</option>" + shifts.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+    typeSelect.innerHTML  = "<option value='All'>All</option>" + types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+    shiftSelect.disabled = false; typeSelect.disabled = false;
+  }
+  applyFilters();
 };
 
-if (localStorage.getItem('nids_user')) {
-  currentUser = JSON.parse(localStorage.getItem('nids_user'));
-  document.querySelector(".app").style.display = "flex";
-  document.getElementById("userInfo").textContent = `${currentUser.station || 'Admin'} (${currentUser.role})`;
-  document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem('nids_user'); location.reload(); };
-  document.getElementById("loginModal").remove();
-  setTimeout(() => {
-    map.invalidateSize();
-    initApp();
-  }, 100);
-}
+shiftSelect.onchange = function(){
+  selectedShift = shiftSelect.value;
+  applyFilters();
+};
 
-function initApp() {
-  if (currentUser.role === "admin") {
-    document.getElementById("adminControls").style.display = "block";
-    document.getElementById("exportButtons").style.display = "flex";
-    document.getElementById("stationOnly").style.display = "none";
-  } else {
-    document.getElementById("adminControls").style.display = "none";
-    document.getElementById("exportButtons").style.display = "none";
-    document.getElementById("stationOnly").style.display = "block";
-    document.getElementById("lockedStation").textContent = currentUser.station;
-    selectedStation = currentUser.station;
-  }
+typeSelect.onchange = function(){
+  selectedType = typeSelect.value;
+  applyFilters();
+};
+
+toggleLink.onclick = function(){
+  personnelExpanded = !personnelExpanded;
+  applyFilters();
+};
+
+refreshBtn.onclick = function(){
+  selectedStation="All"; selectedShift="All"; selectedType="All";
+  stationSelect.value="All"; shiftSelect.value="All"; typeSelect.value="All";
+  map.setView(defaultCenter, defaultZoom);
   loadData();
+};
 
-  stationSelect.onchange = () => { selectedStation = stationSelect.value; applyFilters(); };
-  shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
-  typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
-  refreshBtn.onclick = () => { localStorage.removeItem('nids_data_final'); loadData(); };
-}
+/* ===========================
+   INITIAL LOAD
+   =========================== */
+loadData();
+setInterval(() => { loadData(); }, 600000);
+
+/* Security */
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || (e.ctrlKey && e.keyCode === 85)) {
+    e.preventDefault(); return false;
+  }
+});
 </script>
 </body>
 </html>
