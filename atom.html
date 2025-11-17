@@ -3,330 +3,287 @@
 <head>
   <meta charset="utf-8" />
   <title>NIDS v2.0</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    :root{--bg:#121212; --panel:#1f1f1f; --muted:#777; --accent:#00bfff; --gold:#ffcc00; --card:#222;}
-    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
-    .app{display:flex;height:100vh}
-    .sidebar {width: 28%; padding: 16px; background: var(--panel); box-sizing: border-box; overflow-y: auto; scrollbar-width: none;}
-    .sidebar::-webkit-scrollbar {display: none;}
-    h1{margin:0 0 10px 0;color:var(--gold);font-size:16px}
-    h2{margin:0 0 10px 0;color:var(--gold);font-size:12px}
-    label{display:block;font-size:13px;color:#ddd;margin:10px 0 6px}
-    select{width:100%;padding:8px;border-radius:6px;background:#2b2b2b;border:1px solid #333;color:#fff}
-    button{margin-top:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{padding:6px;border:1px solid #2a2a2a;font-size:12px}
-    th{background:#2a2a2a;color:var(--gold);text-align:left}
-    .person-row{cursor:pointer}
-    .person-row:hover{background:rgba(255,204,0,0.1)}
-    .person-row.selected{background: linear-gradient(90deg, rgba(255,204,0,0.15), rgba(255,204,0,0.05)); font-weight:600;}
-    #personnelTable td, #personnelTable th{font-size:11px;}
-    .main{flex:1;display:flex;flex-direction:column;padding:10px;box-sizing:border-box}
-    #map{flex:1;border-radius:6px;overflow:hidden;position:relative}
-    #loadingOverlay{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center; background: rgba(0,0,0,0.85); z-index:9999;opacity:0;transition:opacity .3s;}
-    #loadingOverlay.active{opacity:1}
-    .spinner{width:48px;height:48px;border-radius:50%;border:6px solid #222;border-top-color:var(--gold);animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    #summaryBox{position:absolute; bottom:12px; left:12px; background:black; color:yellow; padding:8px 12px; border-radius:6px; font-size:11px; font-weight:500; z-index:500; max-width:360px; opacity:0.95;}
-    .table-container { max-height: 110px; overflow: hidden; border: 1px solid #333; border-radius: 4px; transition: max-height 0.35s ease; }
-    .table-container.expanded { max-height: 420px; overflow-y: auto; }
-    .toggle-link { color: var(--accent); font-size: 12px; cursor: pointer; margin-top: 6px; display: inline-block; }
-    a.viber-link { color: var(--accent); text-decoration: none; font-weight:600; }
+    :root{--bg:#121212;--panel:#1f1f1f;--accent:#00bfff;--gold:#ffcc00;}
+    html,body{height:100%;margin:0;background:var(--bg);color:#eee;font-family:Arial,sans-serif;}
+    .app{display:flex;height:100vh;}
+    .sidebar{width:28%;padding:16px;background:var(--panel);overflow-y:auto;box-sizing:border-box;}
+    h1,h2{color:var(--gold);margin:0 0 12px;font-size:16px;}
+    h2{font-size:13px;}
+    label{display:block;margin:12px 0 6px;color:#ddd;}
+    select,button{width:100%;padding:9px;margin:6px 0;border-radius:6px;border:none;background:#333;color:#fff;cursor:pointer;}
+    button{background:var(--accent);}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
+    th{background:#333;color:var(--gold);padding:6px;text-align:left;}
+    td{padding:5px;border:1px solid #444;}
+    .table-container{max-height:120px;overflow:hidden;border:1px solid #444;border-radius:6px;transition:max-height .4s;}
+    .table-container.expanded{max-height:520px;overflow-y:auto;}
+    .toggle-link{color:var(--accent);cursor:pointer;font-size:12px;margin-top:6px;display:inline-block;}
+    #map{flex:1;background:#000;}
+    #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;z-index:9999;}
+    .spinner{border:8px solid #333;border-top:8px solid var(--gold);border-radius:50%;width:60px;height:60px;animation:s 1s linear infinite;}
+    @keyframes s{to{transform:rotate(360deg)}}
+    #summaryBox{position:absolute;bottom:12px;left:12px;background:#000;color:yellow;padding:10px;border-radius:8px;font-size:13px;z-index:500;opacity:0.95;}
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="sidebar">
-      <h1>NIDS v2.0 <button id="refreshBtn">Refresh</button></h1>
 
-      <label for="stationFilter">Station</label>
-      <select id="stationFilter"><option value="All">All</option></select>
+<div id="loading"><div class="spinner"></div></div>
+<div class="app">
+  <div class="sidebar">
+    <h1>NIDS v2.0 <button id="refresh">Refresh Now</button></h1>
 
-      <label for="shiftFilter">Shift (Manual)</label>
-      <select id="shiftFilter"><option value="All">All</option></select>
+    <label>Station</label>
+    <select id="station"><option value="All">All Stations</option></select>
 
-      <label for="typeFilter">Deployment Type</label>
-      <select id="typeFilter"><option value="All">All</option></select>
+    <label>Shift (Manual)</label>
+    <select id="shift" disabled><option value="All">All Shifts</option></select>
 
-      <h2 style="margin-top:16px">Personnel</h2>
-      <div id="personnelContainer" class="table-container">
-        <table id="personnelTable">
-          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th><th>Station</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <span id="togglePersonnel" class="toggle-link" style="display:none;">Show more</span>
+    <label>Deployment Type</label>
+    <select id="type" disabled><option value="All">All Types</option></select>
 
-      <h2 style="margin-top:20px">8 Focus Crimes</h2>
-      <table id="crimeTable">
-        <thead><tr><th>Crime</th><th>Barangay</th><th><center>Count</center></th></tr></thead>
+    <h2>Personnel (shows 5, click Show more)</h2>
+    <div id="personnelContainer" class="table-container">
+      <table id="personnelTable">
+        <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <div id="showMore" class="toggle-link" style="display:none;"></div>
 
-    <div class="main">
-      <div id="map">
-        <div id="summaryBox">Loading data...</div>
-      </div>
-    </div>
+    <h2 style="margin-top:20px">8 Focus Crimes</h2>
+    <table id="crimeTable">
+      <thead><tr><th>Crime</th><th>Brgy</th><th>Count</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 
-  <div id="loadingOverlay"><div class="spinner"></div></div>
+  <div id="map">
+    <div id="summaryBox">Loading data...</div>
+  </div>
+</div>
 
 <script>
-// === LIVE LINKS (WORKING NOV 17, 2025) ===
-const DEPLOYMENT_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
-const CRIME_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+// ====== WORKING LINKS (November 17, 2025) ======
+const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
-let allData = [], crimeData = [], markers = [];
-let selectedStation = "All", selectedShift = "All", selectedType = "All";
-let personnelExpanded = false;
+let allData = [], crimeData = [], markers = [], expanded = false;
 
-const stationSelect = document.getElementById("stationFilter");
-const shiftSelect = document.getElementById("shiftFilter");
-const typeSelect = document.getElementById("typeFilter");
-const personnelTbody = document.querySelector("#personnelTable tbody");
-const crimeTbody = document.querySelector("#crimeTable tbody");
-const toggleLink = document.getElementById("togglePersonnel");
-const summaryBox = document.getElementById("summaryBox");
-const loadingOverlay = document.getElementById("loadingOverlay");
 const map = L.map('map').setView([9.31, 123.20], 9);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© NOrPPO' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© NOrPPO'}).addTo(map);
 
-function showLoading(yes) { loadingOverlay.classList.toggle("active", yes); }
+function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-function esc(t) { return String(t || "").replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";"); }
-
-function getField(row, ...keys) {
-  for (let k of keys) {
-    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k].trim();
+function robustGet(row, keywords){
+  for(let key in row){
+    if(!row[key]) continue;
+    const low = key.toLowerCase();
+    for(let kw of keywords) if(low.includes(kw)) return row[key].trim();
   }
   return "";
 }
 
-// Ultra-robust column matcher (your sheet has very long column names)
-function robustGet(row, patterns) {
-  for (let key in row) {
-    const val = row[key];
-    if (!val) continue;
-    const lowKey = key.toLowerCase();
-    for (let p of patterns) {
-      if (lowKey.includes(p.toLowerCase())) return val.trim();
-    }
+function parseCoords(row){
+  let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]);
+  if(str){
+    let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n));
+    if(nums.length>=2) return {lat:nums[0],lng:nums[1]};
   }
-  return "";
+  let lat = parseFloat(robustGet(row,["lat","latitude"]));
+  let lng = parseFloat(robustGet(row,["lng","longitude","long"]));
+  if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng};
+  return {lat:9.31,lng:123.20};
 }
 
-function parseCoords(row) {
-  const str = robustGet(row, ["latitude", "lat_long", "coordinates", "lat", "long"]);
-  if (str) {
-    const nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n => !isNaN(n));
-    if (nums.length >= 2) return { lat: nums[0], lng: nums[1] };
-  }
-  const lat = parseFloat(robustGet(row, ["lat", "latitude"]));
-  const lng = parseFloat(robustGet(row, ["lng", "longitude", "long"]));
-  if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-  return { lat: 9.31, lng: 123.20 };
-}
-
-function parsePersonnel(str) {
-  if (!str) return [];
-  return str.split(/[\n,;|]/).map(p => {
-    p = p.replace(/[\(\[\)\]]/g, " ").trim();
-    const m = p.match(/(.*?)(\+?\d{10,15}|0\d{9,12})$/);
-    if (m) {
-      let mob = m[2].replace(/\D/g, "");
-      if (mob.startsWith("0")) mob = "63" + mob.slice(1);
-      return { name: m[1].trim(), mobile: mob };
+function parsePersonnel(str){
+  if(!str) return [];
+  return str.split(/[\n,;|]/).map(p=>{
+    p = p.replace(/[\(\[\)\]]/g," ").trim();
+    let m = p.match(/(.*?)(\+?\d{10,15}|0\d{9,12})$/);
+    if(m){
+      let mob = m[2].replace(/\D/g,"");
+      if(mob.startsWith("0")) mob = "63"+mob.slice(1);
+      return {name:m[1].trim(), mobile:mob};
     }
-    return { name: p.trim(), mobile: "" };
-  }).filter(x => x.name);
+    return {name:p.trim(), mobile:""};
+  }).filter(x=>x.name);
 }
 
-async function loadData() {
-  showLoading(true);
-  try {
-    const [depText, crimeText] = await Promise.all([
-      fetch(DEPLOYMENT_SHEET_CSV + "?_=" + Date.now()).then(r => r.text()),
-      fetch(CRIME_SHEET_CSV + "&_=" + Date.now()).then(r => r.text())
+async function load(){
+  document.getElementById("loading").style.display="flex";
+  try{
+    let [depCsv, crimeCsv] = await Promise.all([
+      fetch(DEPLOY_URL+"&_="+Date.now()).then(r=>r.text()),
+      fetch(CRIME_URL+"&_="+Date.now()).then(r=>r.text())
     ]);
+    let dep = Papa.parse(depCsv,{header:true,skipEmptyLines:true}).data;
+    let cri = Papa.parse(crimeCsv,{header:true,skipEmptyLines:true}).data;
 
-    const dep = Papa.parse(depText, { header: true, skipEmptyLines: true }).data;
-    const crime = Papa.parse(crimeText, { header: true, skipEmptyLines: true }).data;
-
-    allData = dep.map(r => ({
-      Station: robustGet(r, ["station", "unit"]) || "Unknown",
-      Shift: robustGet(r, ["duty shift", "shift"]) || "Any",
-      Type: robustGet(r, ["types deployment", "deployment type", "deployment"]) || "Beat Patrol",
-      CallSign: robustGet(r, ["call sign", "callsign"]) || "—",
-      Location: robustGet(r, ["deployment area", "location", "barangay"]) || "—",
-      Photo: robustGet(r, ["picture", "photo", "image"]),
-      PersonnelRaw: robustGet(r, ["personnel"]),
+    allData = dep.map(r=>({
+      station: robustGet(r,["station","unit"]) || "Unknown",
+      shift: robustGet(r,["duty shift","shift"]) || "Any",
+      type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat",
+      callsign: robustGet(r,["call sign","callsign"]) || "—",
+      area: robustGet(r,["deployment area","location"]) || "—",
+      photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i)||[])[1] || "",
+      personnel: parsePersonnel(robustGet(r,["personnel"])),
       ...parseCoords(r)
-    })).filter(d => d.Station !== "Unknown");
+    })).filter(d=>d.station!=="Unknown");
 
-    allData.forEach(d => d.Personnel = parsePersonnel(d.PersonnelRaw));
-
-    crimeData = crime.map(r => ({
-      Station: robustGet(r, ["station"]) || "Unknown",
-      Crime: robustGet(r, ["focus crimes", "crime"]) || "",
-      Barangay: robustGet(r, ["barangay"]) || ""
+    crimeData = cri.map(r=>({
+      station: robustGet(r,["station"])||"Unknown",
+      crime: robustGet(r,["focus crimes","crime"])||"",
+      brgy: robustGet(r,["barangay"])||""
     }));
 
-    populateFilters();
+    populateStations();
     applyFilters();
-  } catch (e) {
-    alert("Failed to load data. Check internet or sheet permissions.");
+  }catch(e){
+    alert("Data load failed. Check internet or sheet sharing.");
     console.error(e);
-  } finally {
-    showLoading(false);
   }
+  document.getElementById("loading").style.display="none";
 }
 
-function populateFilters() {
-  const stations = [...new Set(allData.map(d => d.Station))].sort();
-  stationSelect.innerHTML = `<option value="All">All</option>` + stations.map(s => `<option>${esc(s)}</option>`).join("");
+function populateStations(){
+  let stations = [...new Set(allData.map(d=>d.station))].sort();
+  let sel = document.getElementById("station");
+  sel.innerHTML = `<option value="All">All Stations</option>`+stations.map(s=>`<option>${esc(s)}</option>`).join("");
 }
 
-stationSelect.onchange = function () {
-  selectedStation = this.value;
-  selectedShift = "All"; selectedType = "All";
+document.getElementById("station").onchange = function(){
+  let val = this.value;
+  let filtered = val==="All"?allData:allData.filter(d=>d.station===val);
+  let shifts = [...new Set(filtered.map(d=>d.shift))].sort();
+  let types  = [...new Set(filtered.map(d=>d.type))].sort();
 
-  if (selectedStation === "All") {
-    shiftSelect.disabled = typeSelect.disabled = true;
-    shiftSelect.innerHTML = `<option value="All">All</option>`;
-    typeSelect.innerHTML = `<option value="All">All</option>`;
-  } else {
-    const filtered = allData.filter(d => d.Station === selectedStation);
-    const shifts = [...new Set(filtered.map(d => d.Shift))].sort();
-    const types = [...new Set(filtered.map(d => d.Type))].sort();
-    shiftSelect.innerHTML = `<option value="All">All</option>` + shifts.map(s => `<option>${esc(s)}</option>`).join("");
-    typeSelect.innerHTML = `<option value="All">All</option>` + types.map(t => `<option>${esc(t)}</option>`).join("");
-    shiftSelect.disabled = typeSelect.disabled = false;
-  }
+  let s = document.getElementById("shift");
+  let t = document.getElementById("type");
+  s.disabled = t.disabled = (val==="All");
+  s.innerHTML = `<option value="All">All Shifts</option>`+shifts.map(x=>`<option>${esc(x)}</option>`).join("");
+  t.innerHTML = `<option value="All">All Types</option>`+types.map(x=>`<option>${esc(x)}</option>`).join("");
   applyFilters();
 };
+document.getElementById("shift").onchange = ()=>applyFilters();
+document.getElementById("type").onchange  = ()=>applyFilters();
 
-shiftSelect.onchange = () => { selectedShift = shiftSelect.value; applyFilters(); };
-typeSelect.onchange = () => { selectedType = typeSelect.value; applyFilters(); };
+function applyFilters(){
+  let station = document.getElementById("station").value;
+  let shift   = document.getElementById("shift").value;
+  let type    = document.getElementById("type").value;
 
-function applyFilters() {
-  const filtered = allData.filter(d =>
-    (selectedStation === "All" || d.Station === selectedStation) &&
-    (selectedShift === "All" || d.Shift === selectedShift) &&
-    (selectedType === "All" || d.Type === selectedType)
+  let filtered = allData.filter(d=>
+    (station==="All" || d.station===station) &&
+    (shift==="All"   || d.shift===shift) &&
+    (type==="All"    || d.type===type)
   );
 
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
 
-  const bounds = [];
-  filtered.forEach(d => {
-    const marker = L.marker([d.lat, d.lng]).addTo(map);
-    const photoHtml = d.Photo ? `<img src="https://drive.google.com/thumbnail?id=${d.Photo.match(/id=([a-zA-Z0-9_-]+)/)?.[1] || d.Photo}" style="max-width:100%;margin-top:8px;border-radius:6px;">` : "";
-    const persHtml = d.Personnel.length ? d.Personnel.map(p => `<div><b>${esc(p.name)}</b><br>${p.mobile ? `+63${p.mobile.slice(-10)}` : "no mobile"}</div>`).join("") : "No personnel";
-
-    marker.bindPopup(`
+  let bounds=[];
+  filtered.forEach(d=>{
+    let m = L.marker([d.lat,d.lng]).addTo(map);
+    let photo = d.photoId?`<img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w800" style="width:100%;margin-top:8px;border-radius:6px;">`:"";
+    let pers = d.personnel.length?d.personnel.map(p=>`<div><b>${esc(p.name)}</b><br>${p.mobile?`+63${p.mobile.slice(-10)}`:"no mobile"}</div>`).join(""):"No personnel";
+    m.bindPopup(`
       <div style="font-size:13px;max-width:340px">
-        <b style="font-size:15px">${esc(d.Station)}</b><br>
-        Area: ${esc(d.Location)}<br>
-        Shift: ${esc(d.Shift)} | ${esc(d.Type)}<br>
-        Callsign: ${esc(d.CallSign)}<hr>
-        ${persHtml}
-        ${photoHtml}
+        <b style="font-size:15px">${esc(d.station)}</b><br>
+        Area: ${esc(d.area)}<br>
+        Shift: ${esc(d.shift)} | ${esc(d.type)}<br>
+        Callsign: ${esc(d.callsign)}<hr>
+        ${pers}${photo}
       </div>
-    `, { maxWidth: 400 });
-    markers.push(marker);
-    bounds.push([d.lat, d.lng]);
+    `,{maxWidth:400});
+    markers.push(m);
+    bounds.push([d.lat,d.lng]);
   });
 
-  if (bounds.length && selectedStation !== "All") map.fitBounds(bounds, { padding: [40, 40] });
+  if(bounds.length && station!=="All") map.fitBounds(bounds,{padding:[40,40]});
   renderPersonnel(filtered);
   renderSummary(filtered);
   renderCrimes();
 }
 
-function renderPersonnel(data) {
-  personnelTbody.innerHTML = "";
-  const container = document.getElementById("personnelContainer");
+function renderPersonnel(data){
+  let tbody = document.querySelector("#personnelTable tbody");
+  tbody.innerHTML="";
+  let container = document.getElementById("personnelContainer");
+  let show = document.getElementById("showMore");
 
-  if (selectedStation === "All") {
-    personnelTbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#aaa;padding:12px;">Select a station to view personnel</td></tr>`;
-    toggleLink.style.display = "none";
-    container.classList.remove("expanded");
-    personnelExpanded = false;
+  if(document.getElementById("station").value==="All"){
+    tbody.innerHTML="<tr><td colspan=3 style='text-align:center;color:#999'>Select a station first</td></tr>";
+    show.style.display="none";
     return;
   }
 
-  let list = [];
-  data.forEach(d => d.Personnel.forEach(p => list.push({ name: p.name, mobile: p.mobile, CallSign: d.CallSign, Station: d.Station })));
+  let list=[];
+  data.forEach(d=>d.personnel.forEach(p=>list.push({...p,callsign:d.callsign})));
 
-  if (list.length === 0) {
-    personnelTbody.innerHTML = `<tr><td colspan="4">No personnel listed</td></tr>`;
-    toggleLink.style.display = "none";
+  if(list.length===0){
+    tbody.innerHTML="<tr><td colspan=3>No personnel listed</td></tr>";
+    show.style.display="none";
     return;
   }
 
-  const visible = personnelExpanded ? list : list.slice(0, 5);
-  visible.forEach(p => {
-    const tr = document.createElement("tr");
-    tr.className = "person-row";
-    tr.innerHTML = `<td>${esc(p.name)}</td><td>${p.mobile ? `+63${p.mobile.slice(-10)}` : "—"}</td><td>${esc(p.CallSign)}</td><td>${esc(p.Station)}</td>`;
-    personnelTbody.appendChild(tr);
+  let visible = expanded?list:list.slice(0,5);
+  visible.forEach(p=>{
+    let tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(p.name)}</td><td>${p.mobile?`+63${p.mobile.slice(-10)}`:"—"}</td><td>${esc(p.callsign)}</td>`;
+    tbody.appendChild(tr);
   });
 
-  if (list.length > 5) {
-    toggleLink.style.display = "inline-block";
-    toggleLink.textContent = personnelExpanded ? "Show less" : `Show more (${list.length - 5} more)`;
-    toggleLink.onclick = () => {
-      personnelExpanded = !personnelExpanded;
-      container.classList.toggle("expanded", personnelExpanded);
-      renderPersonnel(data);
-    };
-  } else {
-    toggleLink.style.display = "none";
+  if(list.length>5){
+    show.style.display="inline-block";
+    show.textContent=expanded?"Show less":`Show more (+${list.length-5})`;
+    show.onclick=()=>{expanded=!expanded; container.classList.toggle("expanded",expanded); renderPersonnel(data);};
+    container.classList.toggle("expanded",expanded);
+  }else{
+    show.style.display="none";
     container.classList.remove("expanded");
   }
 }
 
-function renderSummary(data) {
-  const total = data.reduce((s, d) => s + d.Personnel.length, 0);
-  summaryBox.innerHTML = selectedStation === "All" ?
-    `<b>Total Personnel: ${total}</b>` :
-    `<b>${esc(selectedStation)}</b><br>Total: ${total} personnel`;
+function renderSummary(data){
+  let total = data.reduce((s,d)=>s+d.personnel.length,0);
+  let st = document.getElementById("station").value;
+  document.getElementById("summaryBox").innerHTML = st==="All"?
+    `<b>Total Deployed Personnel: ${total}</b>`:
+    `<b>${esc(st)}</b><br>Total Personnel: ${total}`;
 }
 
-function renderCrimes() {
-  crimeTbody.innerHTML = "";
-  if (selectedStation === "All") {
-    const counts = {};
-    crimeData.forEach(c => counts[c.Crime] = (counts[c.Crime] || 0) + 1);
-    ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(c => {
-      const n = counts[c] || 0;
-      crimeTbody.innerHTML += `<tr style="opacity:${n?1:0.4}"><td>${c}</td><td>All</td><td style="text-align:center">${n}</td></tr>`;
+function renderCrimes(){
+  let tbody=document.querySelector("#crimeTable tbody");
+  tbody.innerHTML="";
+  let st=document.getElementById("station").value;
+  if(st==="All"){
+    let counts={};
+    crimeData.forEach(c=>counts[c.crime]=(counts[c.crime]||0)+1);
+    ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(c=>{
+      let n=counts[c]||0;
+      tbody.innerHTML+=`<tr style="opacity:${n?1:0.4}"><td>${c}</td><td>All</td><td style="text-align:center">${n}</td></tr>`;
     });
-  } else {
-    const list = crimeData.filter(c => c.Station === selectedStation);
-    if (list.length === 0) {
-      crimeTbody.innerHTML = `<tr><td colspan="3">No crime data</td></tr>`;
-    } else {
-      const map = {};
-      list.forEach(c => { const k = c.Crime + "|" + c.Barangay; map[k] = (map[k] || 0) + 1; });
-      Object.entries(map).forEach(([k, v]) => {
-        const [crime, brgy] = k.split("|");
-        crimeTbody.innerHTML += `<tr><td>${esc(crime)}</td><td>${esc(brgy)}</td><td style="text-align:center">${v}</td></tr>`;
+  }else{
+    let list=crimeData.filter(c=>c.station===st);
+    if(!list.length) tbody.innerHTML="<tr><td colspan=3>No crime data</td></tr>";
+    else{
+      let map={};
+      list.forEach(c=>{let k=c.crime+"|"+c.brgy; map[k]=(map[k]||0)+1;});
+      Object.entries(map).forEach(([k,v])=>{
+        let [crime,brgy]=k.split("|");
+        tbody.innerHTML+=`<tr><td>${esc(crime)}</td><td>${esc(brgy)}</td><td style="text-align:center">${v}</td></tr>`;
       });
     }
   }
 }
 
-document.getElementById("refreshBtn").onclick = loadData;
-loadData();
-setInterval(loadData, 600000); // 10 minutes
+document.getElementById("refresh").onclick=()=>{load();};
+load();
+setInterval(load,600000); // refresh every 10 mins
 </script>
 </body>
 </html>
