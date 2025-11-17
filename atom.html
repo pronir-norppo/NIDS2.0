@@ -28,13 +28,10 @@
     .spinner{border:8px solid #333;border-top:8px solid var(--gold);border-radius:50%;width:60px;height:60px;animation:s 1s linear infinite;}
     @keyframes s{to{transform:rotate(360deg)}}
     #summaryBox{position:absolute;bottom:12px;left:12px;background:#000;color:yellow;padding:10px;border-radius:8px;font-size:13px;z-index:500;opacity:0.95;max-width:380px;}
-    
-    /* Custom Police Icon */
-    .police-icon { width: 38px !important; height: 48px !important; background: url('https://pronir-norppo.github.io/NIDS2.0/police.png') no-repeat center; background-size: contain; margin: -24px 0 0 -19px !important; }
-    
+
     /* Beautiful Popup */
     .leaflet-popup-content-wrapper { background:#1f1f1f; color:#eee; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.8); }
-    .leaflet-popup-content { margin:0; padding:12px; font-size:13px; max-height:80vh; overflow-y:auto; }
+    .leaflet-popup-content { margin:12px; font-size:13px; max-height:80vh; overflow-y:auto; }
     .leaflet-popup-tip { background:#1f1f1f; }
     .popup-photo img { width:420px; height:300px; object-fit:cover; border-radius:8px; margin-top:10px; display:block; border:2px solid #444; }
   </style>
@@ -77,16 +74,16 @@
 </div>
 
 <script>
-// Custom Police Icon
-const policeIcon = L.divIcon({
-  className: "police-icon",
-  html: "",
-  iconSize: [38, 48],
-  iconAnchor: [19, 48],
-  popupAnchor: [0, -48]
-});
+// === RESTORED: Your Original ICONS Object ===
+const ICONS = {
+  "Foot/Beat": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Motorcycle": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Mobile": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Checkpoint": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "Stationed": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[32,32], iconAnchor:[16,32] }),
+  "default": L.icon({ iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png", iconSize:[32,32], iconAnchor:[16,32] })
+};
 
-// Working Links (Nov 17, 2025)
 const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
 const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
@@ -96,7 +93,6 @@ const map = L.map('map').setView([9.31, 123.20], 9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© NOrPPO'}).addTo(map);
 
 function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function makeViber(num){ return num ? `viber://chat?number=%2B63${num.slice(-10)}` : "#"; }
 
 function robustGet(row, keywords){
   for(let key in row){
@@ -119,18 +115,19 @@ function parseCoords(row){
   return {lat:9.31,lng:123.20};
 }
 
+// FIXED: Mobile number parsing now works perfectly
 function parsePersonnel(str){
   if(!str) return [];
   return str.split(/[\n,;|]/).map(p=>{
     p = p.replace(/[\(\[\)\]]/g," ").trim();
-    let m = p.match(/(.*?)(\+?\d{10,15}|0\d{9,12})$/);
+    let m = p.match(/(.*?)[\s]*(\+?\d{10,15}|0\d{9,12})\s*$/);
     if(m){
       let mob = m[2].replace(/\D/g,"");
-      if(mob.startsWith("0")) mob = "63"+mob.slice(1);
-      return {name:m[1].trim(), mobile:mob};
+      if(mob.startsWith("0")) mob = "63" + mob.slice(1);
+      if(mob.length >= 10) return {name: (m[1]||"Unknown").trim(), mobile: mob};
     }
-    return {name:p.trim(), mobile:""};
-  }).filter(x=>x.name);
+    return {name: p.trim() || "Unknown", mobile: ""};
+  }).filter(p => p.name && p.name !== "Unknown");
 }
 
 async function load(){
@@ -152,7 +149,7 @@ async function load(){
       photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i)||[])[1] || "",
       personnel: parsePersonnel(robustGet(r,["personnel"])),
       ...parseCoords(r)
-    })).filter(d=>d.station!=="Unknown");
+    })).filter(d=>d.station!=="Unknown" && d.personnel.length > 0);
 
     crimeData = cri.map(r=>({
       station: robustGet(r,["station"])||"Unknown",
@@ -205,25 +202,38 @@ function applyFilters(){
 
   let bounds=[];
   filtered.forEach(d=>{
-    let m = L.marker([d.lat,d.lng], {icon: policeIcon}).addTo(map);
-    let photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200" alt="Photo"></div>` : "";
-    let pers = d.personnel.length ? d.personnel.map(p=>`
-      <div style="margin:8px 0; padding:6px; background:rgba(255,255,255,0.05); border-radius:6px;">
+    // FIXED: Use correct icon based on deployment type
+    let iconKey = d.type.includes("Foot") || d.type.includes("Beat") ? "Foot/Beat" :
+                  d.type.includes("Motorcycle") ? "Motorcycle" :
+                  d.type.includes("Mobile") ? "Mobile" :
+                  d.type.includes("Checkpoint") ? "Checkpoint" :
+                  d.type.includes("Stationed") ? "Stationed" : "default";
+    let icon = ICONS[iconKey] || ICONS["default"];
+
+    let m = L.marker([d.lat,d.lng], {icon: icon}).addTo(map);
+    
+    let persHtml = d.personnel.map(p=>`
+      <div style="margin:8px 0; padding:8px; background:rgba(255,255,255,0.05); border-radius:6px;">
         <b>${esc(p.name)}</b><br>
-        <a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff">+63${p.mobile.slice(-10)}</a> | 
-        <a href="${makeViber(p.mobile)}" style="color:#7f4bff">Viber</a>
-      </div>`).join("") : "<i>No personnel listed</i>";
+        ${p.mobile ? `
+          <a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff; margin-right:10px;">+63${p.mobile.slice(-10)}</a>
+          <a href="viber://chat?number=%2B63${p.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>
+        ` : "<span style='color:#888'>No mobile</span>"}
+      </div>
+    `).join("");
+
+    let photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
 
     m.bindPopup(`
-      <div style="font-size:13px; max-width:420px;">
+      <div style="font-size:13px; max-width:440px;">
         <b style="font-size:16px; color:#ffcc00;">${esc(d.station)}</b><br>
         Area: ${esc(d.area)}<br>
         Shift: ${esc(d.shift)} | Type: ${esc(d.type)}<br>
         Callsign: <b>${esc(d.callsign)}</b><hr style="border:0; border-top:1px solid #444; margin:10px 0;">
-        ${pers}
+        ${persHtml}
         ${photo}
       </div>
-    `,{maxWidth:460});
+    `,{maxWidth:480});
     markers.push(m);
     bounds.push([d.lat,d.lng]);
   });
@@ -234,7 +244,6 @@ function applyFilters(){
   renderCrimes();
 }
 
-// === Personnel Table (5 + Show more) ===
 function renderPersonnel(data){
   let tbody = document.querySelector("#personnelTable tbody");
   tbody.innerHTML="";
@@ -247,7 +256,7 @@ function renderPersonnel(data){
   }
 
   let list=[];
-  data.forEach(d=>d.personnel.forEach(p=>list.push({...p,callsign:d.callsign})));
+  data.forEach(d=>d.personnel.forEach(p=>list.push({name:p.name, mobile:p.mobile, callsign:d.callsign})));
 
   if(list.length===0){
     tbody.innerHTML="<tr><td colspan=3>No personnel listed</td></tr>";
@@ -257,9 +266,11 @@ function renderPersonnel(data){
   let visible = expanded?list:list.slice(0,5);
   visible.forEach(p=>{
     let tr=document.createElement("tr");
-    tr.innerHTML=`<td>${esc(p.name)}</td>
-      <td>${p.mobile?`<a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff">+63${p.mobile.slice(-10)}</a>`:"—"}</td>
-      <td>${esc(p.callsign)}</td>`;
+    tr.innerHTML=`
+      <td>${esc(p.name)}</td>
+      <td>${p.mobile ? `<a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff">+63${p.mobile.slice(-10)}</a>` : "—"}</td>
+      <td>${esc(p.callsign)}</td>
+    `;
     tbody.appendChild(tr);
   });
 
@@ -267,10 +278,8 @@ function renderPersonnel(data){
     show.style.display="inline-block";
     show.textContent=expanded?"Show less":`Show more (+${list.length-5})`;
     show.onclick=()=>{expanded=!expanded; container.classList.toggle("expanded",expanded); renderPersonnel(data);};
-    container.classList.toggle("expanded",expanded);
   }else{
     show.style.display="none";
-    container.classList.remove("expanded");
   }
 }
 
