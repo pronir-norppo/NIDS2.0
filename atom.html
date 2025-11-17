@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS v2.0 - Fully Fixed & Working</title>
+  <title>NIDS v2.0 - Work in Progress</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.html"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{--bg:#121212;--panel:#1f1f1f;--accent:#00bfff;--gold:#ffcc00;}
@@ -18,7 +18,7 @@
     h2{font-size:13px;}
     select,button{width:100%;padding:9px;margin:6px 0;border-radius:6px;border:none;background:#333;color:#fff;cursor:pointer;}
     button{background:var(--accent);}
-    .toggle-btn{background:#ff4444;color:white;padding:10px;border-radius:8px;text-align:center;margin:15px 0;cursor:pointer;font-weight:bold;}
+    .toggle-btn{background:#ff4444;color:white;padding:10px;border-radius:8px;text-align:center;margin:8px 0;cursor:pointer;font-weight:bold;font-size:13px;}
     .toggle-btn.active{background:#44aa44;}
     table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
     th{background:#333;color:var(--gold);padding:6px;text-align:left;}
@@ -31,10 +31,33 @@
     .spinner{border:8px solid #333;border-top:8px solid var(--gold);border-radius:50%;width:60px;height:60px;animation:s 1s linear infinite;margin-bottom:20px;}
     @keyframes s{to{transform:rotate(360deg)}}
     #summaryBox{position:absolute;bottom:12px;left:12px;background:#000;color:yellow;padding:10px;border-radius:8px;font-size:13px;z-index:500;opacity:0.95;max-width:380px;}
+
+    /* === YOUR ORIGINAL POPUP STYLE - FULLY RESTORED === */
+    .leaflet-popup-content-wrapper { 
+      background:#1f1f1f; 
+      color:#eee; 
+      border-radius:12px; 
+      box-shadow:0 4px 20px rgba(0,0,0,0.8); 
+    }
+    .leaflet-popup-content { 
+      margin:12px; 
+      font-size:13px; 
+    }
+    .leaflet-popup-tip { 
+      background:#1f1f1f; 
+    }
+    .popup-photo img { 
+      width:320px; 
+      height:200px; 
+      object-fit:cover; 
+      border-radius:8px; 
+      margin-top:10px; 
+      border:2px solid #444; 
+    }
   </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div><div>Loading NIDS Data...</div></div>
+<div id="loading"><div class="spinner"></div><div>Loading NIDS v2.0...</div></div>
 <div class="app">
   <div class="sidebar">
     <h1>NIDS v2.0 <button id="refresh">Refresh Data</button></h1>
@@ -48,6 +71,7 @@
     <h2>Deployment Type</h2>
     <select id="type" disabled><option value="All">All Types</option></select>
 
+    <div id="toggleDeployment" class="toggle-btn active">Hide Deployment Markers</div>
     <div id="toggleCrimeMarkers" class="toggle-btn active">Hide Crime Markers</div>
 
     <h2>List of Personnel</h2>
@@ -82,7 +106,7 @@ const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1
 const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 
 let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null, expanded = false;
-let showCrimeMarkers = true;
+let showDeployment = true, showCrimeMarkers = true;
 
 const map = L.map('map').setView([9.31, 123.20], 9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO'}).addTo(map);
@@ -100,14 +124,13 @@ function robustGet(row, keywords){
 
 function parseCoords(row){
   let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]);
-  if(str){
-    let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n));
+  if(str){ let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n));
     if(nums.length>=2) return {lat:nums[0],lng:nums[1]};
   }
   let lat = parseFloat(robustGet(row,["lat","latitude"]));
   let lng = parseFloat(robustGet(row,["lng","longitude","long"]));
   if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng};
-  return {lat:9.31,lng:123.20};
+  return null;
 }
 
 function getMobileNumber(row){
@@ -121,7 +144,7 @@ function getMobileNumber(row){
 function parseLatLong(str){
   if(!str) return null;
   const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n));
-  if(parts.length >= 2) return {lat:parts[0],lng:parts[1]};
+  if(parts.length >= 2) return {lat:parts[0], lng:parts[1]};
   return null;
 }
 
@@ -135,7 +158,7 @@ function getCrimeIcon(crime){
             <i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i>
             <i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i>
           </span>`,
-    className:"",iconSize:[28,28],iconAnchor:[14,28]
+    className:"", iconSize:[28,28], iconAnchor:[14,28]
   });
 }
 
@@ -143,25 +166,29 @@ async function load(){
   document.getElementById("loading").style.display = "flex";
   try {
     const [depCsv, crimeCsv] = await Promise.all([
-      fetch(DEPLOY_URL).then(r => r.ok ? r.text() : Promise.reject("Deployment sheet failed")),
+      fetch(DEPLOY_URL).then(r => r.ok ? r.text() : Promise.reject("Deployment failed")),
       fetch(CRIME_URL).then(r => r.ok ? r.text() : Promise.reject("Crime sheet failed"))
     ]);
 
     const dep = Papa.parse(depCsv, {header:true, skipEmptyLines:true}).data;
     const cri = Papa.parse(crimeCsv, {header:true, skipEmptyLines:true}).data;
 
-    allData = dep.map(r => ({
-      station: robustGet(r,["station","unit"]) || "Unknown",
-      shift: robustGet(r,["duty shift","shift"]) || "Any",
-      type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat",
-      callsign: robustGet(r,["call sign","callsign"]) || "—",
-      area: robustGet(r,["deployment area","location"]) || "—",
-      photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "",
-      leaderName: robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team"])
-        .split(/[\n,;|]/).map(s=>s.trim()).filter(s=>s)[0] || "Unknown",
-      mobile: getMobileNumber(r),
-      ...parseCoords(r)
-    })).filter(d => d.station !== "Unknown" && d.mobile);
+    allData = dep.map(r => {
+      const coords = parseCoords(r);
+      if (!coords) return null;
+      return {
+        station: robustGet(r,["station","unit"]) || "Unknown",
+        shift: robustGet(r,["duty shift","shift"]) || "Any",
+        type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat",
+        callsign: robustGet(r,["call sign","callsign"]) || "—",
+        area: robustGet(r,["deployment area","location"]) || "—",
+        photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "",
+        leaderName: robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team"]).split(/[\n,;|]/).map(s=>s.trim()).filter(s=>s)[0] || "Unknown",
+        mobile: getMobileNumber(r),
+        lat: coords.lat,
+        lng: coords.lng
+      };
+    }).filter(Boolean);
 
     crimeData = [];
     cri.forEach(r => {
@@ -170,15 +197,15 @@ async function load(){
       let station = robustGet(r,["station"]) || "Unknown";
       let coordStr = robustGet(r,["lat long","lat_long","coordinates","latlong","location"]);
       let coords = parseLatLong(coordStr);
-      if(coords && crime.trim()) {
-        crimeData.push({station, crime:crime.trim(), brgy, lat:coords.lat, lng:coords.lng});
+      if(coords && crime) {
+        crimeData.push({station, crime: crime.trim(), brgy, lat:coords.lat, lng:coords.lng});
       }
     });
 
     populateStations();
     applyFilters();
   } catch(e) {
-    document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Failed to load data<br>${e}</div>`;
+    document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>${e}</div>`;
     console.error(e);
   } finally {
     document.getElementById("loading").style.display = "none";
@@ -189,6 +216,13 @@ function populateStations(){
   const stations = [...new Set(allData.map(d=>d.station))].sort();
   document.getElementById("station").innerHTML = `<option value="All">All Stations</option>` + stations.map(s=>`<option>${esc(s)}</option>`).join("");
 }
+
+document.getElementById("toggleDeployment").onclick = function(){
+  showDeployment = !showDeployment;
+  this.textContent = showDeployment ? "Hide Deployment Markers" : "Show Deployment Markers";
+  this.classList.toggle("active", showDeployment);
+  applyFilters();
+};
 
 document.getElementById("toggleCrimeMarkers").onclick = function(){
   showCrimeMarkers = !showCrimeMarkers;
@@ -202,11 +236,9 @@ document.getElementById("station").onchange = function(){
   const filtered = val==="All" ? allData : allData.filter(d=>d.station===val);
   const shifts = [...new Set(filtered.map(d=>d.shift))].sort();
   const types = [...new Set(filtered.map(d=>d.type))].sort();
-  const s = document.getElementById("shift");
-  const t = document.getElementById("type");
-  s.disabled = t.disabled = (val==="All");
-  s.innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
-  t.innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
+  document.getElementById("shift").disabled = document.getElementById("type").disabled = (val==="All");
+  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
+  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
   applyFilters();
 };
 
@@ -219,60 +251,74 @@ function applyFilters(){
   const type = document.getElementById("type").value;
 
   markers.forEach(m=>map.removeLayer(m)); markers = [];
-  const bounds = [];
+  crimeMarkers.forEach(m=>map.removeLayer(m)); crimeMarkers = [];
+  if(heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
 
-  allData.filter(d=>
+  const filteredData = allData.filter(d=>
     (station==="All" || d.station===station) &&
     (shift==="All" || d.shift===shift) &&
     (type==="All" || d.type===type)
-  ).forEach(d=>{
-    const key = d.type.includes("Foot")||d.type.includes("Beat")?"Foot/Beat":
-                d.type.includes("Motorcycle")?"Motorcycle":
-                d.type.includes("Mobile")?"Mobile":
-                d.type.includes("Checkpoint")?"Checkpoint":
-                d.type.includes("Stationed")?"Stationed":"default";
-    const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
-    const mobileHtml = d.mobile ? `+63${d.mobile.slice(-10)} | <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>` : "—";
-    const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
-    m.bindPopup(`<div style="font-size:13px;max-width:440px;">
-      <b style="font-size:16px;color:#ffcc00;">${esc(d.station)}</b><br>
-      Area: ${esc(d.area)} | Shift: ${esc(d.shift)} | Type: ${esc(d.type)}<br>
-      Callsign: <b>${esc(d.callsign)}</b><hr style="border-top:1px solid #444;">
-      <div style="padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;">
-        <b>${esc(d.leaderName)}</b><br>${mobileHtml}
-      </div>${photo}
-    </div>`,{maxWidth:480});
-    markers.push(m);
-    bounds.push([d.lat,d.lng]);
-  });
-  if(bounds.length && station!=="All") map.fitBounds(bounds,{padding:[40,40]});
+  );
 
-  if(heatLayer) map.removeLayer(heatLayer);
-  crimeMarkers.forEach(m=>map.removeLayer(m)); crimeMarkers = [];
+  if(showDeployment){
+    const bounds = [];
+    filteredData.forEach(d=>{
+      const key = d.type.includes("Foot")||d.type.includes("Beat")?"Foot/Beat":
+                  d.type.includes("Motorcycle")?"Motorcycle":
+                  d.type.includes("Mobile")?"Mobile":
+                  d.type.includes("Checkpoint")?"Checkpoint":
+                  d.type.includes("Stationed")?"Stationed":"default";
+      const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
+      
+      // YOUR ORIGINAL POPUP HTML - 100% RESTORED
+      const mobileHtml = d.mobile ? `
+        <a title="Contact Number" style="color:#00bfff;margin-right:10px;">+63${d.mobile.slice(-10)}</a> | 
+        <a title="Call using Viber" href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#7f4bff;">Viber</a>
+      ` : `<span style="color:#888;">No mobile</span>`;
+      const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
+      
+      m.bindPopup(`
+        <div style="font-size:13px;max-width:440px;">
+          <b style="font-size:16px;color:#ffcc00;">${esc(d.station)}</b><br>
+          Area: ${esc(d.area)}<br>
+          Shift: ${esc(d.shift)}<br>
+          Deployment: ${esc(d.type)}<br>
+          Callsign: <b>${esc(d.callsign)}</b>
+          <hr style="border:0;border-top:1px solid #444;margin:10px 0;">
+          <div style="margin:8px 0;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;">
+            <b>${esc(d.leaderName)}</b><br>${mobileHtml}
+          </div>${photo}
+        </div>
+      `,{maxWidth:480});
+      markers.push(m);
+      bounds.push([d.lat,d.lng]);
+    });
+    if(bounds.length && station!=="All") map.fitBounds(bounds,{padding:[40,40]});
+  }
 
   const crimes = station==="All" ? crimeData : crimeData.filter(c=>c.station===station);
   if(crimes.length>0){
     heatLayer = L.heatLayer(crimes.map(c=>[c.lat,c.lng,1]),{
-      radius:30,blur:22,maxZoom:17,
+      radius:30, blur:22, maxZoom:17,
       gradient:{0.2:"#00ff00",0.5:"#ffff00",0.8:"#ff8000",1.0:"#ff0000"}
     }).addTo(map);
 
     if(showCrimeMarkers){
       crimes.forEach(c=>{
         const m = L.marker([c.lat,c.lng],{icon:getCrimeIcon(c.crime)})
-          .bindPopup(`<h2>${esc(c.crime)}</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
+          .bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
           .addTo(map);
         crimeMarkers.push(m);
       });
     }
   }
 
-  renderPersonnel(allData.filter(d=>station==="All"||d.station===station));
-  renderSummary(allData.filter(d=>station==="All"||d.station===station));
+  renderPersonnel(filteredData);
+  renderSummary(filteredData);
   renderCrimes();
 }
 
-function renderPersonnel(data){
+function renderPersonnel(data){ /* your original working code */ 
   const tbody = document.querySelector("#personnelTable tbody");
   tbody.innerHTML = "";
   const container = document.getElementById("personnelContainer");
@@ -280,35 +326,23 @@ function renderPersonnel(data){
 
   if(document.getElementById("station").value === "All"){
     tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#999'>Select a station first</td></tr>";
-    show.style.display = "none";
-    return;
+    show.style.display = "none"; return;
   }
-
   const list = data.map(d=>({name:d.leaderName, mobile:d.mobile, callsign:d.callsign}));
-  if(list.length===0){
-    tbody.innerHTML = "<tr><td colspan=3>No personnel</td></tr>";
-    show.style.display = "none";
-    return;
-  }
-
+  if(list.length===0){ tbody.innerHTML = "<tr><td colspan=3>No personnel</td></tr>"; show.style.display="none"; return; }
   const visible = expanded ? list : list.slice(0,5);
   visible.forEach(p=>{
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(p.name)}</td>
+    tr.innerHTML = `<td>${esc(p.name)}</td>
       <td>${p.mobile ? `<a href="tel:+63${p.mobile.slice(-10)}" style="color:#00bfff">+63${p.mobile.slice(-10)}</a> <a href="viber://chat?number=%2B63${p.mobile.slice(-10)}" style="color:#7f4bff;margin-left:6px;">Viber</a>` : "—"}</td>
-      <td>${esc(p.callsign)}</td>
-    `;
+      <td>${esc(p.callsign)}</td>`;
     tbody.appendChild(tr);
   });
-
   if(list.length>5){
     show.style.display="inline-block";
     show.textContent = expanded ? "Show less" : `Show more (+${list.length-5})`;
     show.onclick = ()=>{ expanded=!expanded; container.classList.toggle("expanded",expanded); renderPersonnel(data); };
-  }else{
-    show.style.display="none";
-  }
+  }else show.style.display="none";
 }
 
 function renderSummary(data){
@@ -348,7 +382,7 @@ function renderCrimes(){
 
 document.getElementById("refresh").onclick = load;
 load();
-setInterval(load, 600000); // refresh every 10 mins
+setInterval(load, 600000);
 </script>
 </body>
 </html>
