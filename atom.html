@@ -64,9 +64,9 @@
 <div id="loading"><div class="spinner"></div><div>Loading NIDS v2.0...</div></div>
 <div class="app">
   <div class="sidebar">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
   <h1 style="margin:0; color:var(--gold); font-size:16px;">NIDS v2.0</h1>
-  <button id="refresh" style="margin:0; padding:8px 14px; font-size:13px; height:36px;">Refresh Data</button>
+  <button id="refresh" style="margin:0; padding:8px 6px; font-size:13px; height:24px;">Refresh Data</button>
 </div>
     
     <h2>Station</h2>
@@ -228,14 +228,14 @@ function populateStations(){
 
 document.getElementById("toggleDeployment").onclick = function(){
   showDeployment = !showDeployment;
-  this.textContent = showDeployment ? "Hide Deployment Markers" : "Show Deployment Markers";
+  this.textContent = showDeployment ? "Hide Deployment" : "Show Deployment";
   this.classList.toggle("active", showDeployment);
   applyFilters();
 };
 
 document.getElementById("toggleCrimeMarkers").onclick = function(){
   showCrimeMarkers = !showCrimeMarkers;
-  this.textContent = showCrimeMarkers ? "Hide Crime Markers" : "Show Crime Markers";
+  this.textContent = showCrimeMarkers ? "Hide Crime" : "Show Crime";
   this.classList.toggle("active", showCrimeMarkers);
   applyFilters();
 };
@@ -358,8 +358,8 @@ function renderSummary(data){
   const total = data.length;
   const st = document.getElementById("station").value;
   document.getElementById("summaryBox").innerHTML = st==="All" ?
-    `<b>Total Deployed Units: ${total}</b>` :
-    `<b>${esc(st)}</b><br>Total Units: ${total}`;
+    `<b>Total Deployed Personnel: ${total}</b>` :
+    `<b>${esc(st)}</b><br>Total Personnel: ${total}`;
 }
 
 function renderCrimes(){
