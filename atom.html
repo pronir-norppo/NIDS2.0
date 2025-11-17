@@ -40,15 +40,15 @@
 <div id="loading"><div class="spinner"></div></div>
 <div class="app">
   <div class="sidebar">
-    <h1>NIDS v2.0 <button id="refresh">Refresh Now</button></h1>
-    <label>Station</label>
+    <h1>NIDS v2.0 <button id="refresh">Refresh Data</button></h1>
+    <h2>Station</h2>
     <select id="station"><option value="All">All Stations</option></select>
-    <label>Shift (Manual)</label>
+    <h2>Shift</h2>
     <select id="shift" disabled><option value="All">All Shifts</option></select>
-    <label>Deployment Type</label>
+    <h2>Deployment Type</h2>
     <select id="type" disabled><option value="All">All Types</option></select>
 
-    <h2>Personnel (5 by default)</h2>
+    <h2>List of Personnel</h2>
     <div id="personnelContainer" class="table-container">
       <table id="personnelTable">
         <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th></tr></thead>
@@ -57,7 +57,7 @@
     </div>
     <div id="showMore" class="toggle-link" style="display:none;"></div>
 
-    <h2 style="margin-top:20px">8 Focus Crimes</h2>
+    <h2 style="margin-top:20px">8 Focus Crimes Recap</h2>
     <table id="crimeTable">
       <thead><tr><th>Crime</th><th>Brgy</th><th>Count</th></tr></thead>
       <tbody></tbody>
@@ -241,7 +241,7 @@ function applyFilters(){
         <b style="font-size:16px;color:#ffcc00;">${esc(d.station)}</b><br>
         Area: ${esc(d.area)}<br>
         Shift: ${esc(d.shift)}<br>
-        Type: ${esc(d.type)}<br>
+        Deployment: ${esc(d.type)}<br>
         Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:10px 0;">
         <div style="margin:8px 0;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;">
           <b>${esc(d.leaderName)}</b><br>${mobileHtml}
@@ -281,7 +281,7 @@ function applyFilters(){
   renderCrimes();
 }
 
-// === YOUR ORIGINAL FUNCTIONS (unchanged) ===
+// === MAP FUNCTIONS ===
 function renderPersonnel(data){
   let tbody = document.querySelector("#personnelTable tbody");
   tbody.innerHTML="";
