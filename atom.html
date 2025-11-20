@@ -117,7 +117,10 @@ const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1Im
 let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null, expanded = false;
 let showDeployment = true, showCrimeMarkers = true;
 
-const map = L.map('map').setView([9.31, 123.20], 9);
+// Default view (same as initial load)
+const defaultView = { center: [9.31, 123.20], zoom: 9 };
+
+const map = L.map('map').setView(defaultView.center, defaultView.zoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO'}).addTo(map);
 
 function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -186,7 +189,6 @@ async function load(){
       const coords = parseCoords(r);
       if (!coords) return null;
 
-      // === FIXED: Keep full list of personnel ===
       let rawPersonnel = robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team","leader"]);
       let personnelList = rawPersonnel 
         ? rawPersonnel.split(/[\n,;|]/).map(s => s.trim()).filter(s => s) 
@@ -199,8 +201,8 @@ async function load(){
         callsign: robustGet(r,["call sign","callsign"]) || "—",
         area: robustGet(r,["deployment area","location"]) || "—",
         photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "",
-        leaderName: personnelList[0] || "Unknown",           // First name only for table/summary
-        personnelList: personnelList,                        // Full array for popup
+        leaderName: personnelList[0] || "Unknown",
+        personnelList: personnelList,
         mobile: getMobileNumber(r),
         lat: coords.lat,
         lng: coords.lng
@@ -287,7 +289,6 @@ function applyFilters(){
                   d.type.includes("Stationed")?"Stationed":"default";
       const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
       
-      // === FIXED POPUP: Show ALL names ===
       const personnelHtml = d.personnelList.map(name => `<b>${esc(name)}</b>`).join("<br>");
       const mobileHtml = d.mobile ? `
         <a title="Contact Number" style="color:#00bfff;margin-right:10px;">+63${d.mobile.slice(-10)}</a> | 
@@ -311,7 +312,15 @@ function applyFilters(){
       markers.push(m);
       bounds.push([d.lat,d.lng]);
     });
-    if(bounds.length && station!=="All") map.fitBounds(bounds,{padding:[40,40]});
+
+    // === FIXED: Zoom behavior ===
+    if (station === "All") {
+      // Back to full province view when "All Stations" is selected
+      map.setView(defaultView.center, defaultView.zoom, {animate: true});
+    } else if (bounds.length > 0) {
+      // Only fit bounds when a specific station is selected
+      map.fitBounds(bounds, {padding: [40, 40], animate: true});
+    }
   }
 
   const crimes = station==="All" ? crimeData : crimeData.filter(c=>c.station===station);
