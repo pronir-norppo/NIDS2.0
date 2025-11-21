@@ -284,7 +284,13 @@ async function load(){
     lastLoadTime = new Date();
     document.getElementById("lastUpdate").textContent = lastLoadTime.toLocaleTimeString('en-PH');
     populateStations();
+
+    // ←←← ADD THESE TWO LINES (enables filters on first load)
+    document.getElementById("shift").disabled = false;
+    document.getElementById("type").disabled = false;
+
     applyFilters();  // Rebuild everything fresh
+    
   } catch(e) {
     console.error(e);
     document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>Check connection</div>`;
@@ -311,14 +317,29 @@ document.getElementById("toggleCrimeMarkers").addEventListener("change", (e) => 
 
 document.getElementById("station").addEventListener("change", function(){
   const val = this.value;
-  const filtered = val==="All" ? allData : allData.filter(d=>d.station===val);
-  const shifts = [...new Set(filtered.map(d=>d.shift))].sort();
-  const types = [...new Set(filtered.map(d=>d.type))].sort();
-  // Enable Shift and Type filters by default (even when "All Stations" is selected)
+
+  // When "All Stations" → show shifts/types from the entire province
+  // When a station is selected → show only shifts/types used by that station
+  const baseData = val === "All" ? allData : allData.filter(d => d.station === val);
+
+  const shifts = [...new Set(baseData.map(d => d.shift))].sort();
+  const types  = [...new Set(baseData.map(d => d.type))].sort();
+
+  // ALWAYS enable both filters
   document.getElementById("shift").disabled = false;
-  document.getElementById("type").disabled = false;
-  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
-  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
+  document.getElementById("type").disabled  = false;
+
+  // Repopulate the dropdowns
+  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + 
+    shifts.map(x => `<option>${esc(x)}</option>`).join("");
+
+  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + 
+    types.map(x => `<option>${esc(x)}</option>`).join("");
+
+  // Optional: reset to "All" when changing station (keeps UI clean)
+  document.getElementById("shift").value = "All";
+  document.getElementById("type").value  = "All";
+
   applyFilters();
 });
 
