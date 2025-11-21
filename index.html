@@ -96,8 +96,7 @@ BTC    /* Cards */
     </div>
 
     <div class="card">
-      <h2>Show / Hide Map Layers</h2>
-      <div class="toggle-switch">
+     <div class="toggle-switch">
         <span>Deployment Markers</span>
         <label class="switch"><input type="checkbox" id="toggleDeployment" checked><span class="slider"></span></label>
       </div>
@@ -149,11 +148,11 @@ const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1Im
 
 let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null;
 let showDeployment = true, showCrimeMarkers = true;
-const defaultView = { center: [9.31, 123.20], zoom: 9 };
+const defaultView = { center: [10.0208318,122.9803167], zoom: 9 };
 let lastLoadTime = null;
 
 const map = L.map('map').setView(defaultView.center, defaultView.zoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© PICTMU, NOrPPO, PRO NIR'}).addTo(map);
 
 // Live Clock
 setInterval(() => {
