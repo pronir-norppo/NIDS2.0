@@ -314,7 +314,9 @@ document.getElementById("station").addEventListener("change", function(){
   const filtered = val==="All" ? allData : allData.filter(d=>d.station===val);
   const shifts = [...new Set(filtered.map(d=>d.shift))].sort();
   const types = [...new Set(filtered.map(d=>d.type))].sort();
-  document.getElementById("shift").disabled = document.getElementById("type").disabled = (val==="All");
+  // Enable Shift and Type filters by default (even when "All Stations" is selected)
+  document.getElementById("shift").disabled = false;
+  document.getElementById("type").disabled = false;
   document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
   document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
   applyFilters();
