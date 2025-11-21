@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS v2.0 - Dashboard</title>
+  <title>NIDS v2.0 - Negros Oriental Real-Time Deployment</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -28,7 +28,6 @@
     .app{display:flex;height:100vh;position:relative;}
     .sidebar{width:380px;padding:20px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;box-shadow:2px 0 15px rgba(0,0,0,0.6);z-index:1000;}
 
-    /* Floating Live Clock - Top Right on Map */
     #liveClock{
       position:absolute;
       top:12px;
@@ -86,8 +85,6 @@
 </head>
 <body>
 <div id="loading"><div class="spinner"></div><div>Loading NIDS v2.0...</div></div>
-
-<!-- Floating Live Clock on Map -->
 <div id="liveClock">00:00:00</div>
 
 <div class="app">
@@ -161,59 +158,31 @@ const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1Im
 
 let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null;
 let showDeployment = true, showCrimeMarkers = true;
-const defaultView = { center: [10.0208318, 122.9803167], zoom: 9 };
+const defaultView = { center: [9.31, 123.20], zoom: 9 };
 let lastLoadTime = null;
 
 const map = L.map('map').setView(defaultView.center, defaultView.zoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO, PRO NIR'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO'}).addTo(map);
 
-// Live Clock - Top Right
+// Live Clock
 setInterval(() => {
   const now = new Date();
   document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-PH', {hour12: false});
 }, 1000);
 
 function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function robustGet(row, keywords){
-  for(let key in row){ if(!row[key]) continue; const low = key.toLowerCase();
-    for(let kw of keywords) if(low.includes(kw)) return row[key].trim();
-  } return "";
-}
-function parseCoords(row){
-  let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]);
-  if(str){ let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n));
-    if(nums.length>=2) return {lat:nums[0],lng:nums[1]};
-  }
-  let lat = parseFloat(robustGet(row,["lat","latitude"]));
-  let lng = parseFloat(robustGet(row,["lng","longitude","long"]));
-  if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng};
-  return null;
-}
-function getMobileNumber(row){
-  let raw = robustGet(row,["Contact Number","contact number","contact","mobile","phone"]);
-  if(!raw) return "";
-  let m = raw.replace(/\D/g,"");
-  if(m.startsWith("0")) m = "63" + m.slice(1);
-  return (m.length >= 10) ? m : "";
-}
-function parseLatLong(str){
-  if(!str) return null;
-  const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n));
-  if(parts.length >= 2) return {lat:parts[0], lng:parts[1]};
-  return null;
-}
-function getCrimeIcon(crime){
-  const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"};
-  const cls = map[crime] || "fa-triangle-exclamation";
-  return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"", iconSize:[28,28], iconAnchor:[14,28]});
-}
+function robustGet(row, keywords){ for(let key in row){ if(!row[key]) continue; const low = key.toLowerCase(); for(let kw of keywords) if(low.includes(kw)) return row[key].trim(); } return ""; }
+function parseCoords(row){ let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]); if(str){ let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n)); if(nums.length>=2) return {lat:nums[0],lng:nums[1]}; } let lat = parseFloat(robustGet(row,["lat","latitude"])); let lng = parseFloat(robustGet(row,["lng","longitude","long"])); if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng}; return null; }
+function getMobileNumber(row){ let raw = robustGet(row,["Contact Number","contact number","contact","mobile","phone"]); if(!raw) return ""; let m = raw.replace(/\D/g,""); if(m.startsWith("0")) m = "63" + m.slice(1); return (m.length >= 10) ? m : ""; }
+function parseLatLong(str){ if(!str) return null; const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n)); if(parts.length >= 2) return {lat:parts[0], lng:parts[1]}; return null; }
+function getCrimeIcon(crime){ const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"}; const cls = map[crime] || "fa-triangle-exclamation"; return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"", iconSize:[28,28], iconAnchor:[14,28]}); }
 
 async function load(){
-  document.getElementById("loading").style.display = "flex";  // SHOW
+  document.getElementById("loading").style.display = "flex";
   try {
     const [depCsv, crimeCsv] = await Promise.all([
-      fetch(DEPLOY_URL).then(r => r.ok ? r.text() : Promise.reject("Deployment sheet failed")),
-      fetch(CRIME_URL).then(r => r.ok ? r.text() : Promise.reject("Crime sheet failed"))
+      fetch(DEPLOY_URL).then(r => r.ok ? r.text() : Promise.reject()),
+      fetch(CRIME_URL).then(r => r.ok ? r.text() : Promise.reject())
     ]);
 
     const dep = Papa.parse(depCsv, {header:true, skipEmptyLines:true}).data;
@@ -223,19 +192,7 @@ async function load(){
       const coords = parseCoords(r); if (!coords) return null;
       let rawPersonnel = robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team","leader"]);
       let personnelList = rawPersonnel ? rawPersonnel.split(/[\n,;|]/).map(s => s.trim()).filter(s => s) : ["Unknown"];
-      return {
-        station: robustGet(r,["station","unit"]) || "Unknown",
-        shift: robustGet(r,["duty shift","shift"]) || "Any",
-        type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat",
-        callsign: robustGet(r,["call sign","callsign"]) || "—",
-        area: robustGet(r,["deployment area","location"]) || "—",
-        photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "",
-        leaderName: personnelList[0] || "Unknown",
-        personnelList: personnelList,
-        mobile: getMobileNumber(r),
-        lat: coords.lat,
-        lng: coords.lng
-      };
+      return {station: robustGet(r,["station","unit"]) || "Unknown", shift: robustGet(r,["duty shift","shift"]) || "Any", type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat", callsign: robustGet(r,["call sign","callsign"]) || "—", area: robustGet(r,["deployment area","location"]) || "—", photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "", leaderName: personnelList[0] || "Unknown", personnelList: personnelList, mobile: getMobileNumber(r), lat: coords.lat, lng: coords.lng };
     }).filter(Boolean);
 
     crimeData = [];
@@ -251,12 +208,12 @@ async function load(){
     lastLoadTime = new Date();
     document.getElementById("lastUpdate").textContent = lastLoadTime.toLocaleTimeString('en-PH');
     populateStations();
-    applyFilters();
+    applyFilters();  // Rebuild everything fresh
   } catch(e) {
-    document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>${e}</div>`;
     console.error(e);
+    document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>Check connection</div>`;
   } finally {
-    document.getElementById("loading").style.display = "none";  // ALWAYS HIDE
+    document.getElementById("loading").style.display = "none";
   }
 }
 
@@ -265,10 +222,18 @@ function populateStations(){
   document.getElementById("station").innerHTML = `<option value="All">All Stations</option>` + stations.map(s=>`<option>${esc(s)}</option>`).join("");
 }
 
-document.getElementById("toggleDeployment").onchange = () => { showDeployment = this.checked; applyFilters(); };
-document.getElementById("toggleCrimeMarkers").onchange = () => { showCrimeMarkers = this.checked; applyFilters(); };
+// FIXED: Proper event listeners
+document.getElementById("toggleDeployment").addEventListener("change", (e) => {
+  showDeployment = e.target.checked;
+  applyFilters();  // Always fully rebuild when toggling
+});
 
-document.getElementById("station").onchange = function(){
+document.getElementById("toggleCrimeMarkers").addEventListener("change", (e) => {
+  showCrimeMarkers = e.target.checked;
+  applyFilters();  // Always fully rebuild
+});
+
+document.getElementById("station").addEventListener("change", function(){
   const val = this.value;
   const filtered = val==="All" ? allData : allData.filter(d=>d.station===val);
   const shifts = [...new Set(filtered.map(d=>d.shift))].sort();
@@ -277,40 +242,45 @@ document.getElementById("station").onchange = function(){
   document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
   document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
   applyFilters();
-};
-document.getElementById("shift").onchange = document.getElementById("type").onchange = () => applyFilters();
+});
+
+document.getElementById("shift").addEventListener("change", applyFilters);
+document.getElementById("type").addEventListener("change", applyFilters);
 
 function applyFilters(){
   const station = document.getElementById("station").value;
   const shift = document.getElementById("shift").value;
   const type = document.getElementById("type").value;
 
-  markers.forEach(m=>map.removeLayer(m)); markers = [];
-  crimeMarkers.forEach(m=>map.removeLayer(m)); crimeMarkers = [];
-  if(heatLayer) map.removeLayer(heatLayer); heatLayer = null;
+  // Always clear everything first
+  markers.forEach(m => map.removeLayer(m)); markers = [];
+  crimeMarkers.forEach(m => map.removeLayer(m)); crimeMarkers = [];
+  if(heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
 
-  const filteredData = allData.filter(d=>
-    (station==="All" || d.station===station) &&
-    (shift==="All" || d.shift===shift) &&
-    (type==="All" || d.type===type)
+  const filteredData = allData.filter(d =>
+    (station === "All" || d.station === station) &&
+    (shift === "All" || d.shift === shift) &&
+    (type === "All" || d.type === type)
   );
 
-  if(showDeployment){
+  // === DEPLOYMENT MARKERS ===
+  if (showDeployment && filteredData.length > 0) {
     const bounds = [];
-    filteredData.forEach(d=>{
+    filteredData.forEach(d => {
       const key = d.type.includes("Foot")||d.type.includes("Beat")?"Foot/Beat":
                   d.type.includes("Motorcycle")?"Motorcycle":
                   d.type.includes("Mobile")?"Mobile":
                   d.type.includes("Checkpoint")?"Checkpoint":
                   d.type.includes("Stationed")?"Stationed":"default";
-      const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
+      const m = L.marker([d.lat, d.lng], {icon: ICONS[key] || ICONS.default}).addTo(map);
       const personnelHtml = d.personnelList.map(name => `<b>${esc(name)}</b>`).join("<br>");
       const mobileHtml = d.mobile ? `<a href="tel:+63${d.mobile.slice(-10)}" style="color:#00ffff;">+63${d.mobile.slice(-10)}</a> | <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#a855f7;">Viber</a>` : `<span style="color:#888;">No mobile</span>`;
       const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
-      m.bindPopup(`<div style="font-size:13.5px;max-width:460px;"><b style="font-size:17px;color:#ffd700;">${esc(d.station)}</b><br>Area: ${esc(d.area)}<br>Shift: ${esc(d.shift)}<br>Deployment: ${esc(d.type)}<br>Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:12px 0;"><div style="padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">${personnelHtml}<br>${mobileHtml}</div>${photo}</div>`,{maxWidth:500});
+      m.bindPopup(`<div style="font-size:13.5px;max-width:460px;"><b style="font-size:17px;color:#ffd700;">${esc(d.station)}</b><br>Area: ${esc(d.area)}<br>Shift: ${esc(d.shift)}<br>Deployment: ${esc(d.type)}<br>Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:12px 0;"><div style="padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">${personnelHtml}<br>${mobileHtml}</div>${photo}</div>`, {maxWidth:500});
       markers.push(m);
-      bounds.push([d.lat,d.lng]);
+      bounds.push([d.lat, d.lng]);
     });
+
     if (station === "All") {
       map.setView(defaultView.center, defaultView.zoom, {animate: true});
     } else if (bounds.length > 0) {
@@ -318,17 +288,20 @@ function applyFilters(){
     }
   }
 
-  const crimes = station==="All" ? crimeData : crimeData.filter(c=>c.station===station);
-  if(crimes.length>0){
-    heatLayer = L.heatLayer(crimes.map(c=>[c.lat,c.lng,1]),{radius:30, blur:22, maxZoom:17, gradient:{0.2:"#00ff00",0.5:"#ffff00",0.8:"#ff8000",1.0:"#ff0000"}}).addTo(map);
-    if(showCrimeMarkers){
-      crimes.forEach(c=>{
-        const m = L.marker([c.lat,c.lng],{icon:getCrimeIcon(c.crime)})
-          .bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
-          .addTo(map);
-        crimeMarkers.push(m);
-      });
-    }
+  // === CRIME LAYERS ===
+  const crimes = station === "All" ? crimeData : crimeData.filter(c => c.station === station);
+  if (crimes.length > 0 && showCrimeMarkers) {
+    heatLayer = L.heatLayer(crimes.map(c => [c.lat, c.lng, 1]), {
+      radius: 30, blur: 22, maxZoom: 17,
+      gradient: {0.2: "#00ff00", 0.5: "#ffff00", 0.8: "#ff8000", 1.0: "#ff0000"}
+    }).addTo(map);
+
+    crimes.forEach(c => {
+      const m = L.marker([c.lat, c.lng], {icon: getCrimeIcon(c.crime)})
+        .bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
+        .addTo(map);
+      crimeMarkers.push(m);
+    });
   }
 
   document.getElementById("totalCount").textContent = filteredData.length;
@@ -337,7 +310,8 @@ function applyFilters(){
   renderCrimes();
 }
 
-function renderPersonnel(data){
+// renderPersonnel() and renderCrimes() remain exactly the same as before
+function renderPersonnel(data){ /* ... your existing code ... */ 
   const tbody = document.querySelector("#personnelTable tbody"); tbody.innerHTML = "";
   if(document.getElementById("station").value === "All"){
     tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#999;padding:20px;'>Please select a station to view personnel</td></tr>";
@@ -353,12 +327,11 @@ function renderPersonnel(data){
   });
 }
 
-function renderCrimes(){
+function renderCrimes(){ /* ... your existing code ... */ 
   const tbody = document.querySelector("#crimeTable tbody"); tbody.innerHTML = "";
   const st = document.getElementById("station").value;
   if(st === "All"){
-    const counts = {};
-    crimeData.forEach(c=>counts[c.crime]=(counts[c.crime]||0)+1);
+    const counts = {}; crimeData.forEach(c=>counts[c.crime]=(counts[c.crime]||0)+1);
     ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(crime=>{
       const n = counts[crime]||0;
       tbody.innerHTML += `<tr style="opacity:${n?1:0.4}"><td>${crime}</td><td>All</td><td style="text-align:center;font-weight:bold;">${n}</td></tr>`;
@@ -368,8 +341,7 @@ function renderCrimes(){
     if(list.length===0){
       tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#888;padding:20px;'>No crime data</td></tr>";
     }else{
-      const map = {};
-      list.forEach(c=>{ const key = c.crime+"|"+c.brgy; map[key]=(map[key]||0)+1; });
+      const map = {}; list.forEach(c=>{ const key = c.crime+"|"+c.brgy; map[key]=(map[key]||0)+1; });
       Object.entries(map).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
         const [crime,brgy] = k.split("|");
         tbody.innerHTML += `<tr><td>${esc(crime)}</td><td>${esc(brgy)}</td><td style="text-align:center;font-weight:bold;">${v}</td></tr>`;
@@ -380,7 +352,7 @@ function renderCrimes(){
 
 document.getElementById("refresh").onclick = load;
 load();
-setInterval(load, 600000);  // auto-refresh every 10 minutes
+setInterval(load, 600000);
 </script>
 </body>
 </html>
