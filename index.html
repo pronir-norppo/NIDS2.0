@@ -190,6 +190,7 @@
         <span>Crime</span>
       </div>
     </div>
+    <br>
 
     <div class="card">
       <h2 id="personnelTitle">List of Personnel</h2>
@@ -242,7 +243,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'Â
 // Live Clock
 setInterval(() => {
   const now = new Date();
-  document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-PH', {hour12: false});
+  document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-PH', {hour12: true});
 }, 1000);
 
 function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
