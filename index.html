@@ -83,14 +83,66 @@
     .popup-photo img{width:340px;height:210px;object-fit:cover;border-radius:10px;margin-top:12px;border:2px solid var(--border);}
 
     /* Compact Layer Toggles */
-    .layer-toggles{display:flex;gap:16px;align-items:center;background:rgba(255,255,255,0.05);padding:8px 14px;border-radius:12px;border:1px solid var(--border);}
-    .layer-toggle{display:flex;align-items:center;gap:8px;font-size:13px;}
-    .mini-switch{position:relative;display:inline-block;width:40px;height:22px;}
-    .mini-switch input{opacity:0;width:0;height:0;}
-    .mini-slider{position:absolute;inset:0;background:#555;border-radius:34px;transition:.3s;}
-    .mini-slider:before{position:absolute;content:"";height:18px;width:18px;left:2px;bottom:2px;background:#000;border-radius:50%;transition:.3s;}
-    input:checked + .mini-slider{background:var(--accent);}
-    input:checked + .mini-slider:before{transform:translateX(18px);}
+     .layer-toggles{
+      display:flex;
+      gap:20px;                     /* nicer spacing */
+      align-items:center;
+      justify-content:center;       /* horizontally center the whole group */
+      background:rgba(255,255,255,0.05);
+      padding:10px 18px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      backdrop-filter:blur(6px);
+    }
+    .layer-toggle{
+      display:flex;
+      align-items:center;           /* vertical center */
+      justify-content:center;       /* horizontal center */
+      gap:10px;
+      font-size:14px;
+      white-space:nowrap;
+      color:var(--text);
+    }
+    .layer-toggle i{
+      font-size:16px;
+      color:var(--accent);
+    }
+    .mini-switch{
+      position:relative;
+      display:inline-block;
+      width:44px;
+      height:24px;
+    }
+    .mini-slider{
+      position:absolute;
+      inset:0;
+      background:#555;
+      border-radius:34px;
+      transition:.3s;
+    }
+    .mini-slider:before{
+      position:absolute;
+      content:"";
+      height:20px;
+      width:20px;
+      left:2px;
+      bottom:2px;
+      background:#000;
+      border-radius:50%;
+      transition:.3s;
+    }
+    input:checked + .mini-slider{
+      background:var(--accent);
+    }
+    input:checked + .mini-slider:before{
+      transform:translateX(20px);
+    }
+
+    /* Optional: make text a bit bolder and nicer */
+    .layer-toggle span{
+      font-weight:500;
+      letter-spacing:0.5px;
+    }
     
   </style>
 </head>
@@ -126,9 +178,17 @@
       </div>
   </div-->
 
-    <div class="layer-toggles">
-     <div class="layer-toggle"><label class="mini-switch"> <input type="checkbox" id="toggleDeployment" checked><span class="mini-slider">Show/Hide Deployment</span></label></div>
-     <div class="layer-toggle"><label class="mini-switch"> <input type="checkbox" id="toggleCrimeMarkers" checked><span class="mini-slider">Show/Hide Crime</span></label></div>
+  <div class="layer-toggles">
+      <div class="layer-toggle">
+        <label class="mini-switch"><input type="checkbox" id="toggleDeployment" checked><span class="mini-slider"></span></label>
+        <i class="fas fa-map-marker-alt"></i>
+        <span>Deployment</span>
+      </div>
+      <div class="layer-toggle">
+        <label class="mini-switch"><input type="checkbox" id="toggleCrimeMarkers" checked><span class="mini-slider"></span></label>
+        <i class="fas fa-fire"></i>
+        <span>Crime</span>
+      </div>
     </div>
 
     <div class="card">
