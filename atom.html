@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIDS 2.0 - Checking requirements</title>
+    <style>
+        /* CSS for the update message container */
+        #update-message {
+            display: none; /* Hidden by default */
+            background-color: #ffdddd;
+            border-left: 6px solid #f44336;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-family: sans-serif;
+        }
+        #update-message a {
+            color: #f44336;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="update-message">
+        <strong>Outdated browser detected!</strong> For the best experience, please consider updating your browser to the latest version or switching to a modern one like Chrome, Firefox, or Edge.
+        <a href="http://outdatedbrowser.com/en" target="_blank">Update My Browser</a>
+    </div>
+
+    <h1>Welcome to our website!</h1>
+    <p>This content requires a modern web browser to function correctly. If you are seeing the warning above, please update your browser.</p>
+
+    <script>
+        // JavaScript for feature detection
+        function checkBrowserFeatures() {
+            // Check for a few modern JavaScript and CSS features
+            const supportsES6 = typeof Symbol !== 'undefined' && typeof Promise !== 'undefined';
+            const supportsCSSGrid = CSS.supports('display', 'grid');
+            const supportsFetch = typeof fetch === 'function';
+
+            // If any critical feature is missing, display the message
+            if (!supportsES6 || !supportsCSSGrid || !supportsFetch) {
+                document.getElementById('update-message').style.display = 'block';
+            }
+        }
+
+        // Run the check when the page loads
+        window.onload = checkBrowserFeatures;
+    </script>
+
+</body>
+</html>
