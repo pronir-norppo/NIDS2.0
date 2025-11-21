@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NIDS v2.0 - NOrPPO Real-Time Deployment</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0e0e0e;
+      --panel:#1a1a1a;
+      --card:#222;
+      --accent:#00ffff;
+      --gold:#ffd700;
+      --green:#00ff9d;
+      --red:#ff2e63;
+      --text:#e0e0e0;
+      --border:#444;
+    }
+    *{box-sizing:border-box;}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;}
+    .app{display:flex;height:100vh;}
+    .sidebar{width:380px;padding:20px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;box-shadow:2px 0 15px rgba(0,0,0,0.6);z-index:1000;position:relative;}
+    
+    /* Header */
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
+    .header h1{margin:0;font-size:28px;color:var(--gold);font-weight:800;}
+    .live-time{font-size:13px;color:var(--accent);background:rgba(0,255,255,0.1);padding:4px 10px;border-radius:6px;}
+    #refresh{background:var(--accent);color:#000;padding:10px 16px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:14px;transition:0.3s;}
+    #refresh:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(0,255,255,0.4);}
+
+BTC    /* Cards */
+    .card{background:var(--card);padding:18px;border-radius:14px;border:1px solid var(--border);margin-bottom:16px;box-shadow:0 4px 15px rgba(0,0,0,0.3);}
+    .card h2{margin:0 0 16px;color:var(--gold);font-size:16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+    .card label{display:block;margin:12px 0 6px;color:#aaa;font-size:13px;}
+
+    select{width:100%;padding:12px;border-radius:10px;border:none;background:#333;color:white;font-size:14px;}
+
+    /* Toggle Switches */
+    .toggle-switch{display:flex;align-items:center;justify-content:space-between;margin:14px 0;font-size:14px;color:var(--text);}
+    .switch{position:relative;display:inline-block;width:52px;height:28px;}
+    .switch input{opacity:0;width:0;height:0;}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#555;border-radius:34px;transition:.3s;}
+    .slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background:#000;border-radius:50%;transition:.3s;}
+    input:checked + .slider{background:var(--accent);}
+    input:checked + .slider:before{transform:translateX(24px);}
+
+    /* Tables */
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+    th{background:#333;color:var(--gold);padding:10px 8px;text-align:left;font-weight:600;}
+    td{padding:10px 8px;border-bottom:1px solid var(--border);}
+    td a{color:var(--accent);text-decoration:none;}
+    td a:hover{text-decoration:underline;}
+
+    /* Map & Overlays */
+    #map{flex:1;background:#000;}
+    #summaryBox{position:absolute;bottom:16px;left:16px;background:rgba(20,20,20,0.97);border:2px solid var(--accent);box-shadow:0 0 20px rgba(0,255,255,0.3);padding:16px;border-radius:14px;max-width:360px;z-index:500;font-size:14px;}
+    #summaryBox b{color:var(--gold);font-size:20px;}
+    .last-update{font-size:12px;color:#888;margin-top:8px;}
+
+    #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.98);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;color:white;font-size:20px;}
+    .spinner{border:10px solid #333;border-top:10px solid var(--gold);border-radius:50%;width:80px;height:80px;animation:s 1s linear infinite;margin-bottom:20px;}
+    @keyframes s{to{transform:rotate(360deg)}}
+
+    /* Popup */
+    .leaflet-popup-content-wrapper{background:#1f1f1f;color:#eee;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.8);}
+    .leaflet-popup-content{margin:14px;font-size:13.5px;}
+    .popup-photo img{width:340px;height:210px;object-fit:cover;border-radius:10px;margin-top:12px;border:2px solid var(--border);}
+  </style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><div>Loading NIDS v2.0...</div></div>
+<div class="app">
+  <div class="sidebar">
+    <div class="header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h1>NIDS v2.0</h1>
+        <div class="live-time" id="liveTime"></div>
+      </div>
+      <button id="refresh"><i class="fas fa-sync-alt"></i> Refresh</button>
+    </div>
+
+    <div class="card">
+      <h2>Filters</h2>
+      <label>Station</label>
+      <select id="station"><option value="All">All Stations</option></select>
+
+      <label>Shift</label>
+      <select id="shift" disabled><option value="All">All Shifts</option></select>
+
+      <label>Deployment Type</label>
+      <select id="type" disabled><option value="All">All Types</option></select>
+    </div>
+
+    <div class="card">
+      <h2>Map Layers</h2>
+      <div class="toggle-switch">
+        <span>Deployment Markers</span>
+        <label class="switch"><input type="checkbox" id="toggleDeployment" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-switch">
+        <span>Crime Heatmap & Markers</span>
+        <label class="switch"><input type="checkbox" id="toggleCrimeMarkers" checked><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="personnelTitle">List of Personnel</h2>
+      <div id="personnelContainer">
+        <table id="personnelTable">
+          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>8 Focus Crimes Recap</h2>
+      <table id="crimeTable">
+        <thead><tr><th>Crime</th><th>Brgy</th><th>Count</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="map">
+    <div id="summaryBox">
+      <b>Total Deployed: <span id="totalCount">—</span></b>
+      <div class="last-update">Last updated: <span id="lastUpdate">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  "Foot/Beat": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/footpatrol.png",iconSize:[32,32],iconAnchor:[16,32]}),
+  "Motorcycle": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/motorpatrol.png",iconSize:[32,32],iconAnchor:[16,32]}),
+  "Mobile": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/mobilepatrol.png",iconSize:[32,32],iconAnchor:[16,32]}),
+  "Checkpoint": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/checkpoint.png",iconSize:[32,32],iconAnchor:[16,32]}),
+  "Stationed": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png",iconSize:[32,32],iconAnchor:[16,32]}),
+  "default": L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/default.png",iconSize:[32,32],iconAnchor:[16,32]})
+};
+
+const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+
+let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null;
+let showDeployment = true, showCrimeMarkers = true;
+const defaultView = { center: [9.31, 123.20], zoom: 9 };
+let lastLoadTime = null;
+
+const map = L.map('map').setView(defaultView.center, defaultView.zoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© NOrPPO'}).addTo(map);
+
+// Live Clock
+setInterval(() => {
+  const now = new Date();
+  document.getElementById('liveTime').textContent = now.toLocaleTimeString('en-PH');
+}, 1000);
+
+// Rest of your JS (only small changes for new UI)
+function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function robustGet(row, keywords){
+  for(let key in row){ if(!row[key]) continue; const low = key.toLowerCase();
+    for(let kw of keywords) if(low.includes(kw)) return row[key].trim();
+  } return "";
+}
+
+function parseCoords(row){ /* unchanged - same as before */ let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]); if(str){ let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n)); if(nums.length>=2) return {lat:nums[0],lng:nums[1]}; } let lat = parseFloat(robustGet(row,["lat","latitude"])); let lng = parseFloat(robustGet(row,["lng","longitude","long"])); if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng}; return null; }
+
+function getMobileNumber(row){ let raw = robustGet(row,["Contact Number","contact number","contact","mobile","phone"]); if(!raw) return ""; let m = raw.replace(/\D/g,""); if(m.startsWith("0")) m = "63" + m.slice(1); return (m.length >= 10) ? m : ""; }
+
+function parseLatLong(str){ if(!str) return null; const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n)); if(parts.length >= 2) return {lat:parts[0], lng:parts[1]}; return null; }
+
+function getCrimeIcon(crime){ const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"}; const cls = map[crime] || "fa-triangle-exclamation"; return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"", iconSize:[28,28], iconAnchor:[14,28]}); }
+
+async function load(){
+  document.getElementById("loading").style.display = "flex";
+  try {
+    const [depCsv, crimeCsv] = await Promise.all([fetch(DEPLOY_URL).then(r=>r.ok?r.text():Promise.reject()), fetch(CRIME_URL).then(r=>r.ok?r.text():Promise.reject())]);
+    const dep = Papa.parse(depCsv, {header:true, skipEmptyLines:true}).data;
+    const cri = Papa.parse(crimeCsv, {header:true, skipEmptyLines:true}).data;
+
+    allData = dep.map(r => {
+      const coords = parseCoords(r); if (!coords) return null;
+      let rawPersonnel = robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team","leader"]);
+      let personnelList = rawPersonnel ? rawPersonnel.split(/[\n,;|]/).map(s => s.trim()).filter(s => s) : ["Unknown"];
+      return {station: robustGet(r,["station","unit"]) || "Unknown", shift: robustGet(r,["duty shift","shift"]) || "Any", type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat", callsign: robustGet(r,["call sign","callsign"]) || "—", area: robustGet(r,["deployment area","location"]) || "—", photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "", leaderName: personnelList[0] || "Unknown", personnelList: personnelList, mobile: getMobileNumber(r), lat: coords.lat, lng: coords.lng };
+    }).filter(Boolean);
+
+    crimeData = []; cri.forEach(r => { let crime = robustGet(r,["focus crimes","crime","offense"]) || ""; let brgy = robustGet(r,["barangay","brgy"]) || ""; let station = robustGet(r,["station"]) || "Unknown"; let coordStr = robustGet(r,["lat long","lat_long","coordinates","latlong","location"]); let coords = parseLatLong(coordStr); if(coords && crime) crimeData.push({station, crime: crime.trim(), brgy, lat:coords.lat, lng:coords.lng}); });
+
+    lastLoadTime = new Date();
+    document.getElementById("lastUpdate").textContent = lastLoadTime.toLocaleTimeString('en-PH');
+    populateStations(); applyFilters();
+  } catch(e) { console.error(e); } 
+  finally { document.getElementById("loading").style.display = "none"; }
+}
+
+function populateStations(){ const stations = [...new Set(allData.map(d=>d.station))].sort(); document.getElementById("station").innerHTML = `<option value="All">All Stations</option>` + stations.map(s=>`<option>${esc(s)}</option>`).join(""); }
+
+// Toggle switches
+document.getElementById("toggleDeployment").onchange = function(){ showDeployment = this.checked; applyFilters(); };
+document.getElementById("toggleCrimeMarkers").onchange = function(){ showCrimeMarkers = this.checked; applyFilters(); };
+
+document.getElementById("station").onchange = function(){
+  const val = this.value; const filtered = val==="All" ? allData : allData.filter(d=>d.station===val);
+  const shifts = [...new Set(filtered.map(d=>d.shift))].sort(); const types = [...new Set(filtered.map(d=>d.type))].sort();
+  document.getElementById("shift").disabled = document.getElementById("type").disabled = (val==="All");
+  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x=>`<option>${esc(x)}</option>`).join("");
+  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x=>`<option>${esc(x)}</option>`).join("");
+  applyFilters();
+};
+document.getElementById("shift").onchange = document.getElementById("type").onchange = () => applyFilters();
+
+function applyFilters(){
+  const station = document.getElementById("station").value;
+  const shift = document.getElementById("shift").value;
+  const type = document.getElementById("type").value;
+
+  markers.forEach(m=>map.removeLayer(m)); markers = [];
+  crimeMarkers.forEach(m=>map.removeLayer(m)); crimeMarkers = [];
+  if(heatLayer) map.removeLayer(heatLayer);
+
+  const filteredData = allData.filter(d=> (station==="All" || d.station===station) && (shift==="All" || d.shift===shift) && (type==="All" || d.type===type));
+
+  if(showDeployment){
+    const bounds = [];
+    filteredData.forEach(d=>{
+      const key = d.type.includes("Foot")||d.type.includes("Beat")?"Foot/Beat": d.type.includes("Motorcycle")?"Motorcycle": d.type.includes("Mobile")?"Mobile": d.type.includes("Checkpoint")?"Checkpoint": d.type.includes("Stationed")?"Stationed":"default";
+      const m = L.marker([d.lat,d.lng],{icon:ICONS[key]||ICONS.default}).addTo(map);
+      const personnelHtml = d.personnelList.map(name => `<b>${esc(name)}</b>`).join("<br>");
+      const mobileHtml = d.mobile ? `<a href="tel:+63${d.mobile.slice(-10)}" style="color:#00ffff;">+63${d.mobile.slice(-10)}</a> | <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#a855f7;">Viber</a>` : `<span style="color:#888;">No mobile</span>`;
+      const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
+      m.bindPopup(`<div style="font-size:13.5px;max-width:460px;"><b style="font-size:17px;color:#ffd700;">${esc(d.station)}</b><br>Area: ${esc(d.area)}<br>Shift: ${esc(d.shift)}<br>Deployment: ${esc(d.type)}<br>Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:12px 0;"><div style="padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">${personnelHtml}<br>${mobileHtml}</div>${photo}</div>`,{maxWidth:500});
+      markers.push(m); bounds.push([d.lat,d.lng]);
+    });
+
+    if (station === "All") {
+      map.setView(defaultView.center, defaultView.zoom, {animate: true});
+    } else if (bounds.length > 0) {
+      map.fitBounds(bounds, {padding: [50, 50], animate: true});
+    }
+  }
+
+  const crimes = station==="All" ? crimeData : crimeData.filter(c=>c.station===station);
+  if(crimes.length>0){
+    heatLayer = L.heatLayer(crimes.map(c=>[c.lat,c.lng,1]),{radius:30, blur:22, maxZoom:17, gradient:{0.2:"#00ff00",0.5:"#ffff00",0.8:"#ff8000",1.0:"#ff0000"}}).addTo(map);
+    if(showCrimeMarkers){
+      crimes.forEach(c=>{ const m = L.marker([c.lat,c.lng],{icon:getCrimeIcon(c.crime)}).bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`).addTo(map); crimeMarkers.push(m); });
+    }
+  }
+
+  document.getElementById("totalCount").textContent = filteredData.length;
+  document.getElementById("personnelTitle").textContent = station === "All" ? "List of Personnel" : `Personnel - ${station}`;
+  renderPersonnel(filteredData);
+  renderCrimes();
+}
+
+function renderPersonnel(data){ 
+  const tbody = document.querySelector("#personnelTable tbody"); tbody.innerHTML = "";
+  if(document.getElementById("station").value === "All"){
+    tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#999;padding:20px;'>Please select a station to view personnel</td></tr>";
+    return;
+  }
+  if(data.length===0){ tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#888;padding:20px;'>No personnel deployed</td></tr>"; return; }
+  data.forEach(p=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(p.leaderName)}</td>
+      <td>${p.mobile ? `<a href="viber://chat?number=%2B63${p.mobile.slice(-10)}">+63${p.mobile.slice(-10)}</a>` : "—"}</td>
+      <td>${esc(p.callsign)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCrimes(){ /* unchanged - same logic as before */ 
+  const tbody = document.querySelector("#crimeTable tbody"); tbody.innerHTML = "";
+  const st = document.getElementById("station").value;
+  if(st === "All"){
+    const counts = {}; crimeData.forEach(c=>counts[c.crime]=(counts[c.crime]||0)+1);
+    ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(crime=>{
+      const n = counts[crime]||0;
+      tbody.innerHTML += `<tr style="opacity:${n?1:0.4}"><td>${crime}</td><td>All</td><td style="text-align:center;font-weight:bold;">${n}</td></tr>`;
+    });
+  }else{
+    const list = crimeData.filter(c=>c.station===st);
+    if(list.length===0){ tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#888;padding:20px;'>No crime data</td></tr>"; }
+    else{
+      const map = {}; list.forEach(c=>{ const key = c.crime+"|"+c.brgy; map[key]=(map[key]||0)+1; });
+      Object.entries(map).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+        const [crime,brgy] = k.split("|");
+        tbody.innerHTML += `<tr><td>${esc(crime)}</td><td>${esc(brgy)}</td><td style="text-align:center;font-weight:bold;">${v}</td></tr>`;
+      });
+    }
+  }
+}
+
+document.getElementById("refresh").onclick = load;
+load();
+setInterval(load, 600000);
+</script>
+</body>
+</html>
