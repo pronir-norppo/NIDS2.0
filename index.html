@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NIDS v2.0 - Negros Oriental Real-Time Deployment</title>
+  <title>NIDS v2.0 - Dashboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -81,6 +81,17 @@
     .leaflet-popup-content-wrapper{background:#1f1f1f;color:#eee;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.8);}
     .leaflet-popup-content{margin:14px;font-size:13.5px;}
     .popup-photo img{width:340px;height:210px;object-fit:cover;border-radius:10px;margin-top:12px;border:2px solid var(--border);}
+
+    /* Compact Layer Toggles */
+    .layer-toggles{display:flex;gap:16px;align-items:center;background:rgba(255,255,255,0.05);padding:8px 14px;border-radius:12px;border:1px solid var(--border);}
+    .layer-toggle{display:flex;align-items:center;gap:8px;font-size:13px;}
+    .mini-switch{position:relative;display:inline-block;width:40px;height:22px;}
+    .mini-switch input{opacity:0;width:0;height:0;}
+    .mini-slider{position:absolute;inset:0;background:#555;border-radius:34px;transition:.3s;}
+    .mini-slider:before{position:absolute;content:"";height:18px;width:18px;left:2px;bottom:2px;background:#000;border-radius:50%;transition:.3s;}
+    input:checked + .mini-slider{background:var(--accent);}
+    input:checked + .mini-slider:before{transform:translateX(18px);}
+    
   </style>
 </head>
 <body>
@@ -95,8 +106,7 @@
     </div>
 
     <div class="card">
-      <h2>Filters</h2>
-      <label>Station</label>
+       <label>Station</label>
       <select id="station"><option value="All">All Stations</option></select>
       <label>Shift</label>
       <select id="shift" disabled><option value="All">All Shifts</option></select>
@@ -104,7 +114,7 @@
       <select id="type" disabled><option value="All">All Types</option></select>
     </div>
 
-    <div class="card">
+    <!-- div class="card">
       <h2>Map Layers</h2>
       <div class="toggle-switch">
         <span>Deployment Markers</span>
@@ -114,6 +124,11 @@
         <span>Crime Heatmap & Markers</span>
         <label class="switch"><input type="checkbox" id="toggleCrimeMarkers" checked><span class="slider"></span></label>
       </div>
+  </div-->
+
+    <div class="layer-toggles">
+      <div class="layer-toggle"><label class="mini-switch"><input type="checkbox" id="toggleDeployment" checked><span class="mini-slider"></span></label><i class="fas fa-map-marker-alt" title="Deployment Markers"></i></div>
+      <div class="layer-toggle"><label class="mini-switch"><input type="checkbox" id="toggleCrimeMarkers" checked><span class="mini-slider"></span></label><i class="fas fa-fire" title="Crime Heatmap & Markers"></i></div>
     </div>
 
     <div class="card">
