@@ -83,63 +83,18 @@
     .popup-photo img{width:340px;height:210px;object-fit:cover;border-radius:10px;margin-top:12px;border:2px solid var(--border);}
 
     .layer-toggles{
-      display:flex;
-      gap:20px;
-      align-items:center;
-      justify-content:center;
-      background:rgba(255,255,255,0.05);
-      padding:10px 18px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      backdrop-filter:blur(6px);
+      display:flex; gap:20px; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.05); padding:10px 18px; border-radius:14px;
+      border:1px solid var(--border); backdrop-filter:blur(6px);
     }
-    .layer-toggle{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-      font-size:14px;
-      white-space:nowrap;
-      color:var(--text);
-    }
-    .layer-toggle i{
-      font-size:16px;
-      color:var(--accent);
-    }
-    .mini-switch{
-      position:relative;
-      display:inline-block;
-      width:44px;
-      height:24px;
-    }
-    .mini-slider{
-      position:absolute;
-      inset:0;
-      background:#555;
-      border-radius:34px;
-      transition:.3s;
-    }
-    .mini-slider:before{
-      position:absolute;
-      content:"";
-      height:20px;
-      width:20px;
-      left:2px;
-      bottom:2px;
-      background:#000;
-      border-radius:50%;
-      transition:.3s;
-    }
-    input:checked + .mini-slider{
-      background:var(--accent);
-    }
-    input:checked + .mini-slider:before{
-      transform:translateX(20px);
-    }
-    .layer-toggle span{
-      font-weight:500;
-      letter-spacing:0.5px;
-    }
+    .layer-toggle{display:flex; align-items:center; justify-content:center; gap:10px; font-size:14px; white-space:nowrap; color:var(--text);}
+    .layer-toggle i{font-size:16px; color:var(--accent);}
+    .mini-switch{position:relative; display:inline-block; width:44px; height:24px;}
+    .mini-slider{position:absolute; inset:0; background:#555; border-radius:34px; transition:.3s;}
+    .mini-slider:before{position:absolute; content:""; height:20px; width:20px; left:2px; bottom:2px; background:#000; border-radius:50%; transition:.3s;}
+    input:checked + .mini-slider{background:var(--accent);}
+    input:checked + .mini-slider:before{transform:translateX(20px);}
+    .layer-toggle span{font-weight:500; letter-spacing:0.5px;}
   </style>
 </head>
 <body>
@@ -204,77 +159,74 @@
 </div>
 
 <script>
-const BASE_ICON_URL = "https://pronir-norppo.github.io/NIDS2.0/icons/new/";
+// Base URL for your GitHub icons
+const ICON_BASE = "https://pronir-norppo.github.io/NIDS2.0/icons/new/";
 
-// Shift → Folder mapping
-const SHIFT_FOLDERS = {
+// Exact mapping based on your uploaded files
+const SHIFT_MAP = {
   "1st Shift": "1st",
   "2nd Shift": "2nd",
-  "3rd Shift": "3rd",
-  "Until the end of the tour of duty": "until-end",
-  "Until end of tour of duty": "until-end",
-  "Until end of tour": "until-end",
-  "Until end": "until-end",
-  "Until EOTD": "until-end"
+  "3rd Shift": "3rd"
 };
 
-// Deployment Type → Icon filename
-const TYPE_TO_ICON = {
-  "Beat": "beat",
-  "Foot": "beat",
-  "Beat Patrol": "beat",
-  "Foot/Beat": "beat",
-  "Foot Patrol": "beat",
-
-  "Motorcycle": "motorcycle",
-  "Motorcycle Patrol": "motorcycle",
-
-  "Mobile": "mobile",
-  "Mobile Patrol": "mobile",
-
-  "Checkpoint": "checkpoint",
-  "Checkpoint Patrol": "checkpoint",
-
-  "Special": "special",
-  "Special Events": "special",
-  "Special Event": "special",
-  "Special Duty": "special",
-  "Event": "special",
-
-  "Stationed": "stationed"
+const TYPE_MAP = {
+  "beat": ["beat", "foot", "foot patrol", "beat patrol"],
+  "motorcycle": ["motorcycle", "motorcycle patrol"],
+  "mobile": ["mobile", "mobile patrol"],
+  "checkpoint": ["checkpoint"],
+  "border": ["border", "border patrol"]
 };
 
-// Build all shift + type icons
+// Pre-create all icons
 const ICONS = {};
-Object.keys(SHIFT_FOLDERS).forEach(shift => {
-  const folder = SHIFT_FOLDERS[shift];
-  Object.keys(TYPE_TO_ICON).forEach(typeKey => {
-    const filename = TYPE_TO_ICON[typeKey];
-    const key = `${shift}|${typeKey}`;
-    const url = `${BASE_ICON_URL}${folder}/${filename}.png`;
-    ICONS[key] = L.icon({
-      iconUrl: url,
-      iconSize: [36, 36],
-      iconAnchor: [18, 36],
-      popupAnchor: [0, -36]
-    });
+Object.entries(SHIFT_MAP).forEach(([shiftName, folder]) => {
+  // Beat
+  ICONS[`${shiftName}|beat`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Beat_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Motorcycle
+  ICONS[`${shiftName}|motorcycle`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Motorcycle_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Mobile
+  ICONS[`${shiftName}|mobile`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Mobile_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Checkpoint
+  ICONS[`${shiftName}|checkpoint`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Checkpoint.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Border Patrol
+  ICONS[`${shiftName}|border`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Border_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
   });
 });
 
-// Stationed icon (same for all shifts)
-Object.keys(SHIFT_FOLDERS).forEach(shift => {
-  ICONS[`${shift}|Stationed`] = L.icon({
-    iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png",
-    iconSize: [36, 36],
-    iconAnchor: [18, 36]
-  });
-});
-
-// Default fallback
+// Fallback icons
 ICONS["default"] = L.icon({
   iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png",
   iconSize: [32, 32],
   iconAnchor: [16, 32]
+});
+ICONS["stationed"] = L.icon({
+  iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png",
+  iconSize: [36, 36],
+  iconAnchor: [18, 36]
 });
 
 const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
@@ -286,14 +238,10 @@ const defaultView = { center: [9.7457322, 122.9943032], zoom: 9 };
 let lastLoadTime = null;
 
 const map = L.map('map').setView(defaultView.center, defaultView.zoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© NOrPPO'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© NOrPPO'}).addTo(map);
 
-// Live Clock
 setInterval(() => {
-  const now = new Date();
-  document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-PH', {hour12: true});
+  document.getElementById('liveClock').textContent = new Date().toLocaleTimeString('en-PH', {hour12: true});
 }, 1000);
 
 function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -303,31 +251,26 @@ function getMobileNumber(row){ let raw = robustGet(row,["Contact Number","contac
 function parseLatLong(str){ if(!str) return null; const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n)); if(parts.length >= 2) return {lat:parts[0], lng:parts[1]}; return null; }
 function getCrimeIcon(crime){ const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"}; const cls = map[crime] || "fa-triangle-exclamation"; return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"", iconSize:[28,28], iconAnchor:[14,28]}); }
 
-// Get correct icon based on shift + type
+// MAIN ICON SELECTOR - matches your exact uploaded files
 function getIconForDeployment(shift, type) {
-  const normalizedShift = shift.trim();
-  const matchedShiftKey = Object.keys(SHIFT_FOLDERS).find(key => 
-    normalizedShift.toLowerCase().includes(key.toLowerCase()) ||
-    key.toLowerCase().includes(normalizedShift.toLowerCase())
-  );
+  const lowerType = type.toLowerCase();
+  const lowerShift = shift.toLowerCase();
 
-  const matchedTypeKey = Object.keys(TYPE_TO_ICON).find(key => 
-    type.toLowerCase().includes(key.toLowerCase())
-  );
+  let shiftKey = Object.keys(SHIFT_MAP).find(s => lowerShift.includes(s.toLowerCase()));
+  if (!shiftKey) return ICONS["default"];
 
-  if (matchedShiftKey && matchedTypeKey) {
-    const key = `${matchedShiftKey}|${matchedTypeKey}`;
-    if (ICONS[key]) return ICONS[key];
-  }
+  let iconKey = null;
+  if (TYPE_MAP.beat.some(t => lowerType.includes(t))) iconKey = "beat";
+  else if (TYPE_MAP.motorcycle.some(t => lowerType.includes(t))) iconKey = "motorcycle";
+  else if (TYPE_MAP.mobile.some(t => lowerType.includes(t))) iconKey = "mobile";
+  else if (TYPE_MAP.checkpoint.some(t => lowerType.includes(t))) iconKey = "checkpoint";
+  else if (TYPE_MAP.border.some(t => lowerType.includes(t))) iconKey = "border";
+  else if (lowerType.includes("stationed")) return ICONS["stationed"];
 
-  if (matchedShiftKey && type.toLowerCase().includes("stationed")) {
-    return ICONS[`${matchedShiftKey}|Stationed`] || ICONS["default"];
-  }
-
-  return ICONS["default"];
+  return ICONS[`${shiftKey}|${iconKey}`] || ICONS["default"];
 }
 
-async function load(){
+async function load(){ /* ... same as before ... */ 
   document.getElementById("loading").style.display = "flex";
   try {
     const [depCsv, crimeCsv] = await Promise.all([
@@ -357,15 +300,18 @@ async function load(){
       };
     }).filter(Boolean);
 
-    crimeData = [];
-    cri.forEach(r => {
+    crimeData = cri.filter(r => {
       let crime = robustGet(r,["focus crimes","crime","offense"]) || "";
-      let brgy = robustGet(r,["barangay","brgy"]) || "";
-      let station = robustGet(r,["station"]) || "Unknown";
       let coordStr = robustGet(r,["lat long","lat_long","coordinates","latlong","location"]);
       let coords = parseLatLong(coordStr);
-      if(coords && crime) crimeData.push({station, crime: crime.trim(), brgy, lat:coords.lat, lng:coords.lng});
-    });
+      return coords && crime;
+    }).map(r => ({
+      station: robustGet(r,["station"]) || "Unknown",
+      crime: robustGet(r,["focus crimes","crime","offense"]).trim(),
+      brgy: robustGet(r,["barangay","brgy"]) || "",
+      lat: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lat,
+      lng: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lng
+    }));
 
     lastLoadTime = new Date();
     document.getElementById("lastUpdate").textContent = lastLoadTime.toLocaleTimeString('en-PH');
@@ -376,15 +322,10 @@ async function load(){
 
     document.getElementById("shift").disabled = false;
     document.getElementById("type").disabled  = false;
-
-    document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + 
-      allShifts.map(x => `<option>${esc(x)}</option>`).join("");
-
-    document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + 
-      allTypes.map(x => `<option>${esc(x)}</option>`).join("");
+    document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + allShifts.map(x => `<option>${esc(x)}</option>`).join("");
+    document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + allTypes.map(x => `<option>${esc(x)}</option>`).join("");
 
     applyFilters();
-    
   } catch(e) {
     console.error(e);
     document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>Check connection</div>`;
@@ -398,16 +339,8 @@ function populateStations(){
   document.getElementById("station").innerHTML = `<option value="All">All Stations</option>` + stations.map(s=>`<option>${esc(s)}</option>`).join("");
 }
 
-document.getElementById("toggleDeployment").addEventListener("change", (e) => {
-  showDeployment = e.target.checked;
-  applyFilters();
-});
-
-document.getElementById("toggleCrimeMarkers").addEventListener("change", (e) => {
-  showCrimeMarkers = e.target.checked;
-  applyFilters();
-});
-
+document.getElementById("toggleDeployment").addEventListener("change", e => { showDeployment = e.target.checked; applyFilters(); });
+document.getElementById("toggleCrimeMarkers").addEventListener("change", e => { showCrimeMarkers = e.target.checked; applyFilters(); });
 document.getElementById("station").addEventListener("change", function(){
   const val = this.value;
   const dataForOptions = val === "All" ? allData : allData.filter(d => d.station === val);
@@ -416,18 +349,12 @@ document.getElementById("station").addEventListener("change", function(){
 
   document.getElementById("shift").disabled = false;
   document.getElementById("type").disabled  = false;
-
-  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + 
-    shifts.map(x => `<option>${esc(x)}</option>`).join("");
-
-  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + 
-    types.map(x => `<option>${esc(x)}</option>`).join("");
-
+  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x => `<option>${esc(x)}</option>`).join("");
+  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x => `<option>${esc(x)}</option>`).join("");
   document.getElementById("shift").value = "All";
   document.getElementById("type").value  = "All";
   applyFilters();
 });
-
 document.getElementById("shift").addEventListener("change", applyFilters);
 document.getElementById("type").addEventListener("change", applyFilters);
 
@@ -488,7 +415,7 @@ function applyFilters(){
   renderCrimes();
 }
 
-function renderPersonnel(data){
+function renderPersonnel(data){ /* unchanged */ 
   const tbody = document.querySelector("#personnelTable tbody"); tbody.innerHTML = "";
   if(document.getElementById("station").value === "All"){
     tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#999;padding:20px;'>Please select a station to view personnel</td></tr>";
@@ -504,7 +431,7 @@ function renderPersonnel(data){
   });
 }
 
-function renderCrimes(){
+function renderCrimes(){ /* unchanged */ 
   const tbody = document.querySelector("#crimeTable tbody"); tbody.innerHTML = "";
   const st = document.getElementById("station").value;
   if(st === "All"){
