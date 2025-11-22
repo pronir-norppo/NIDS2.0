@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NIDS v2.0 - Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="author" content="PSSg Leong RAC, PCMS Abejero D, and PMSg Ijan L - Data, UI Design and Code" />
+
+  <style>
+    :root{
+      --bg:#0e0e0e;
+      --panel:#1a1a1a;
+      --card:#222;
+      --accent:#00ffff;
+      --gold:#ffd700;
+      --green:#00ff9d;
+      --red:#ff2e63;
+      --text:#e0e0e0;
+      --border:#444;
+    }
+    *{box-sizing:border-box;}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;}
+    .app{display:flex;height:100vh;position:relative;}
+    .sidebar{width:380px;padding:20px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;box-shadow:2px 0 15px rgba(0,0,0,0.6);z-index:1000;}
+
+    #liveClock{
+      position:absolute;
+      top:12px;
+      right:12px;
+      background:rgba(10,10,10,0.9);
+      color:var(--accent);
+      padding:10px 20px;
+      border-radius:12px;
+      font-size:20px;
+      font-weight:bold;
+      z-index:600;
+      border:2px solid var(--accent);
+      box-shadow:0 0 20px rgba(0,255,255,0.4);
+      backdrop-filter:blur(8px);
+      font-family:'Courier New',monospace;
+      letter-spacing:1.5px;
+    }
+
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:10px;}
+    .header h1{margin:0;font-size:28px;color:var(--gold);font-weight:800;}
+    #refresh{background:var(--accent);color:#000;padding:10px 16px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:14px;transition:.3s;}
+    #refresh:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(0,255,255,0.4);}
+
+    .card{background:var(--card);padding:18px;border-radius:14px;border:1px solid var(--border);margin-bottom:16px;box-shadow:0 4px 15px rgba(0,0,0,0.3);}
+    .card h2{margin:0 0 16px;color:var(--gold);font-size:16px;}
+    .card label{display:block;margin:12px 0 6px;color:#aaa;font-size:13px;}
+    select{width:100%;padding:12px;border-radius:10px;border:none;background:#333;color:white;font-size:14px;}
+    .toggle-switch{display:flex;align-items:center;justify-content:space-between;margin:14px 0;font-size:14px;}
+    .switch{position:relative;display:inline-block;width:52px;height:28px;}
+    .switch input{opacity:0;width:0;height:0;}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#555;border-radius:34px;transition:.3s;}
+    .slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background:#000;border-radius:50%;transition:.3s;}
+    input:checked + .slider{background:var(--accent);}
+    input:checked + .slider:before{transform:translateX(24px);}
+
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{background:#333;color:var(--gold);padding:10px 8px;text-align:left;font-weight:600;}
+    td{padding:10px 8px;border-bottom:1px solid var(--border);}
+    td a{color:var(--accent);text-decoration:none;}
+    td a:hover{text-decoration:underline;}
+
+    #map{flex:1;background:#000;position:relative;}
+    #summaryBox{position:absolute;bottom:16px;left:16px;background:rgba(20,20,20,0.97);border:2px solid var(--accent);box-shadow:0 0 20px rgba(0,255,255,0.3);padding:16px;border-radius:14px;max-width:360px;z-index:500;font-size:14px;}
+    #summaryBox b{color:var(--gold);font-size:20px;}
+    .last-update{font-size:12px;color:#888;margin-top:8px;}
+
+    #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.98);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;color:white;font-size:20px;}
+    .spinner{border:10px solid #333;border-top:10px solid var(--gold);border-radius:50%;width:80px;height:80px;animation:s 1s linear infinite;margin-bottom:20px;}
+    @keyframes s{to{transform:rotate(360deg)}}
+
+    .leaflet-popup-content-wrapper{background:#1f1f1f;color:#eee;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.8);}
+    .leaflet-popup-content{margin:14px;font-size:13.5px;}
+    .popup-photo img{width:340px;height:210px;object-fit:cover;border-radius:10px;margin-top:12px;border:2px solid var(--border);}
+
+    .layer-toggles{
+      display:flex; gap:20px; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.05); padding:10px 18px; border-radius:14px;
+      border:1px solid var(--border); backdrop-filter:blur(6px);
+    }
+    .layer-toggle{display:flex; align-items:center; justify-content:center; gap:10px; font-size:14px; white-space:nowrap; color:var(--text);}
+    .layer-toggle i{font-size:16px; color:var(--accent);}
+    .mini-switch{position:relative; display:inline-block; width:44px; height:24px;}
+    .mini-slider{position:absolute; inset:0; background:#555; border-radius:34px; transition:.3s;}
+    .mini-slider:before{position:absolute; content:""; height:20px; width:20px; left:2px; bottom:2px; background:#000; border-radius:50%; transition:.3s;}
+    input:checked + .mini-slider{background:var(--accent);}
+    input:checked + .mini-slider:before{transform:translateX(20px);}
+    .layer-toggle span{font-weight:500; letter-spacing:0.5px;}
+  </style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><div>Loading NIDS v2.0...</div></div>
+<div id="liveClock">00:00:00</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="header">
+      <h1>NIDS v2.0</h1>
+      <button id="refresh"><i class="fas fa-sync-alt"></i> Refresh</button>
+    </div>
+
+    <div class="card">
+       <label>Station</label>
+      <select id="station"><option value="All">All Stations</option></select>
+      <label>Shift</label>
+      <select id="shift" disabled><option value="All">All Shifts</option></select>
+      <label>Deployment Type</label>
+      <select id="type" disabled><option value="All">All Types</option></select>
+    </div>
+
+    <div class="layer-toggles">
+      <div class="layer-toggle">
+        <label class="mini-switch"><input type="checkbox" id="toggleDeployment" checked><span class="mini-slider"></span></label>
+        <i class="fas fa-map-marker-alt"></i>
+        <span>Deployment</span>
+      </div>
+      <div class="layer-toggle">
+        <label class="mini-switch"><input type="checkbox" id="toggleCrimeMarkers" checked><span class="mini-slider"></span></label>
+        <i class="fas fa-fire"></i>
+        <span>Crime</span>
+      </div>
+    </div>
+    <br>
+
+    <div class="card">
+      <h2 id="personnelTitle">List of Personnel</h2>
+      <div id="personnelContainer">
+        <table id="personnelTable">
+          <thead><tr><th>Name</th><th>Mobile</th><th>CallSign</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>8 Focus Crimes Recap</h2>
+      <table id="crimeTable">
+        <thead><tr><th>Crime</th><th>Brgy</th><th>Count</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="map">
+    <div id="summaryBox">
+      <b>Total Deployed: <span id="totalCount">—</span></b>
+      <div class="last-update">Last updated: <span id="lastUpdate">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Base URL for your GitHub icons
+const ICON_BASE = "https://pronir-norppo.github.io/NIDS2.0/icons/new/";
+
+// Exact mapping based on your uploaded files
+const SHIFT_MAP = {
+  "1st Shift": "1st",
+  "2nd Shift": "2nd",
+  "3rd Shift": "3rd"
+};
+
+const TYPE_MAP = {
+  "beat": ["beat", "foot", "foot patrol", "beat patrol"],
+  "motorcycle": ["motorcycle", "motorcycle patrol"],
+  "mobile": ["mobile", "mobile patrol"],
+  "checkpoint": ["checkpoint"],
+  "border": ["border", "border patrol"]
+};
+
+// Pre-create all icons
+const ICONS = {};
+Object.entries(SHIFT_MAP).forEach(([shiftName, folder]) => {
+  // Beat
+  ICONS[`${shiftName}|beat`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Beat_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Motorcycle
+  ICONS[`${shiftName}|motorcycle`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Motorcycle_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Mobile
+  ICONS[`${shiftName}|mobile`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Mobile_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Checkpoint
+  ICONS[`${shiftName}|checkpoint`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Checkpoint.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+  // Border Patrol
+  ICONS[`${shiftName}|border`] = L.icon({
+    iconUrl: `${ICON_BASE}${folder}_Border_Patrol.png`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+});
+
+// Fallback icons
+ICONS["default"] = L.icon({
+  iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/default.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32]
+});
+ICONS["stationed"] = L.icon({
+  iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png",
+  iconSize: [36, 36],
+  iconAnchor: [18, 36]
+});
+
+const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1g8fbp48sNvJ4YkWhgLiYlW7Js5crfD_LWVgAW-PWQW6ctXgSuVu9xk7G9qKlUzS2Gyi/pub?output=csv";
+const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
+
+let allData = [], crimeData = [], markers = [], crimeMarkers = [], heatLayer = null;
+let showDeployment = true, showCrimeMarkers = true;
+const defaultView = { center: [9.7457322, 122.9943032], zoom: 9 };
+let lastLoadTime = null;
+
+const map = L.map('map').setView(defaultView.center, defaultView.zoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© NOrPPO'}).addTo(map);
+
+setInterval(() => {
+  document.getElementById('liveClock').textContent = new Date().toLocaleTimeString('en-PH', {hour12: true});
+}, 1000);
+
+function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function robustGet(row, keywords){ for(let key in row){ if(!row[key]) continue; const low = key.toLowerCase(); for(let kw of keywords) if(low.includes(kw)) return row[key].trim(); } return ""; }
+function parseCoords(row){ let str = robustGet(row,["latitude","lat_long","coordinates","lat","long"]); if(str){ let nums = str.split(/[^\d\.\-]/).map(parseFloat).filter(n=>!isNaN(n)); if(nums.length>=2) return {lat:nums[0],lng:nums[1]}; } let lat = parseFloat(robustGet(row,["lat","latitude"])); let lng = parseFloat(robustGet(row,["lng","longitude","long"])); if(!isNaN(lat)&&!isNaN(lng)) return {lat,lng}; return null; }
+function getMobileNumber(row){ let raw = robustGet(row,["Contact Number","contact number","contact","mobile","phone"]); if(!raw) return ""; let m = raw.replace(/\D/g,""); if(m.startsWith("0")) m = "63" + m.slice(1); return (m.length >= 10) ? m : ""; }
+function parseLatLong(str){ if(!str) return null; const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n)); if(parts.length >= 2) return {lat:parts[0], lng:parts[1]}; return null; }
+function getCrimeIcon(crime){ const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"}; const cls = map[crime] || "fa-triangle-exclamation"; return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"", iconSize:[28,28], iconAnchor:[14,28]}); }
+
+// MAIN ICON SELECTOR - matches your exact uploaded files
+function getIconForDeployment(shift, type) {
+  const lowerType = type.toLowerCase();
+  const lowerShift = shift.toLowerCase();
+
+  let shiftKey = Object.keys(SHIFT_MAP).find(s => lowerShift.includes(s.toLowerCase()));
+  if (!shiftKey) return ICONS["default"];
+
+  let iconKey = null;
+  if (TYPE_MAP.beat.some(t => lowerType.includes(t))) iconKey = "beat";
+  else if (TYPE_MAP.motorcycle.some(t => lowerType.includes(t))) iconKey = "motorcycle";
+  else if (TYPE_MAP.mobile.some(t => lowerType.includes(t))) iconKey = "mobile";
+  else if (TYPE_MAP.checkpoint.some(t => lowerType.includes(t))) iconKey = "checkpoint";
+  else if (TYPE_MAP.border.some(t => lowerType.includes(t))) iconKey = "border";
+  else if (lowerType.includes("stationed")) return ICONS["stationed"];
+
+  return ICONS[`${shiftKey}|${iconKey}`] || ICONS["default"];
+}
+
+async function load(){ /* ... same as before ... */ 
+  document.getElementById("loading").style.display = "flex";
+  try {
+    const [depCsv, crimeCsv] = await Promise.all([
+      fetch(DEPLOY_URL).then(r => r.ok ? r.text() : Promise.reject()),
+      fetch(CRIME_URL).then(r => r.ok ? r.text() : Promise.reject())
+    ]);
+
+    const dep = Papa.parse(depCsv, {header:true, skipEmptyLines:true}).data;
+    const cri = Papa.parse(crimeCsv, {header:true, skipEmptyLines:true}).data;
+
+    allData = dep.map(r => {
+      const coords = parseCoords(r); if (!coords) return null;
+      let rawPersonnel = robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team","leader"]);
+      let personnelList = rawPersonnel ? rawPersonnel.split(/[\n,;|]/).map(s => s.trim()).filter(s => s) : ["Unknown"];
+      return {
+        station: robustGet(r,["station","unit"]) || "Unknown",
+        shift: robustGet(r,["duty shift","shift"]) || "Any",
+        type: robustGet(r,["types deployment","deployment type","deployment"]) || "Beat",
+        callsign: robustGet(r,["call sign","callsign"]) || "—",
+        area: robustGet(r,["deployment area","location"]) || "—",
+        photoId: (robustGet(r,["picture","photo","image"]).match(/id=([a-zA-Z0-9_-]+)/i) || [])[1] || "",
+        leaderName: personnelList[0] || "Unknown",
+        personnelList: personnelList,
+        mobile: getMobileNumber(r),
+        lat: coords.lat,
+        lng: coords.lng
+      };
+    }).filter(Boolean);
+
+    crimeData = cri.filter(r => {
+      let crime = robustGet(r,["focus crimes","crime","offense"]) || "";
+      let coordStr = robustGet(r,["lat long","lat_long","coordinates","latlong","location"]);
+      let coords = parseLatLong(coordStr);
+      return coords && crime;
+    }).map(r => ({
+      station: robustGet(r,["station"]) || "Unknown",
+      crime: robustGet(r,["focus crimes","crime","offense"]).trim(),
+      brgy: robustGet(r,["barangay","brgy"]) || "",
+      lat: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lat,
+      lng: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lng
+    }));
+
+    lastLoadTime = new Date();
+    document.getElementById("lastUpdate").textContent = lastLoadTime.toLocaleTimeString('en-PH');
+    populateStations();
+
+    const allShifts = [...new Set(allData.map(d => d.shift))].sort();
+    const allTypes  = [...new Set(allData.map(d => d.type))].sort();
+
+    document.getElementById("shift").disabled = false;
+    document.getElementById("type").disabled  = false;
+    document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + allShifts.map(x => `<option>${esc(x)}</option>`).join("");
+    document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + allTypes.map(x => `<option>${esc(x)}</option>`).join("");
+
+    applyFilters();
+  } catch(e) {
+    console.error(e);
+    document.getElementById("loading").innerHTML = `<div style="color:#ff4444;">Load Failed<br>Check connection</div>`;
+  } finally {
+    document.getElementById("loading").style.display = "none";
+  }
+}
+
+function populateStations(){
+  const stations = [...new Set(allData.map(d=>d.station))].sort();
+  document.getElementById("station").innerHTML = `<option value="All">All Stations</option>` + stations.map(s=>`<option>${esc(s)}</option>`).join("");
+}
+
+document.getElementById("toggleDeployment").addEventListener("change", e => { showDeployment = e.target.checked; applyFilters(); });
+document.getElementById("toggleCrimeMarkers").addEventListener("change", e => { showCrimeMarkers = e.target.checked; applyFilters(); });
+document.getElementById("station").addEventListener("change", function(){
+  const val = this.value;
+  const dataForOptions = val === "All" ? allData : allData.filter(d => d.station === val);
+  const shifts = [...new Set(dataForOptions.map(d => d.shift))].sort();
+  const types  = [...new Set(dataForOptions.map(d => d.type))].sort();
+
+  document.getElementById("shift").disabled = false;
+  document.getElementById("type").disabled  = false;
+  document.getElementById("shift").innerHTML = `<option value="All">All Shifts</option>` + shifts.map(x => `<option>${esc(x)}</option>`).join("");
+  document.getElementById("type").innerHTML = `<option value="All">All Types</option>` + types.map(x => `<option>${esc(x)}</option>`).join("");
+  document.getElementById("shift").value = "All";
+  document.getElementById("type").value  = "All";
+  applyFilters();
+});
+document.getElementById("shift").addEventListener("change", applyFilters);
+document.getElementById("type").addEventListener("change", applyFilters);
+
+function applyFilters(){
+  const station = document.getElementById("station").value;
+  const shift = document.getElementById("shift").value;
+  const type = document.getElementById("type").value;
+
+  markers.forEach(m => map.removeLayer(m)); markers = [];
+  crimeMarkers.forEach(m => map.removeLayer(m)); crimeMarkers = [];
+  if(heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+
+  const filteredData = allData.filter(d =>
+    (station === "All" || d.station === station) &&
+    (shift === "All" || d.shift === shift) &&
+    (type === "All" || d.type === type)
+  );
+
+  if (showDeployment && filteredData.length > 0) {
+    const bounds = [];
+    filteredData.forEach(d => {
+      const icon = getIconForDeployment(d.shift, d.type);
+      const m = L.marker([d.lat, d.lng], {icon: icon}).addTo(map);
+
+      const personnelHtml = d.personnelList.map(name => `<b>${esc(name)}</b>`).join("<br>");
+      const mobileHtml = d.mobile ? `<a href="tel:+63${d.mobile.slice(-10)}" style="color:#00ffff;">+63${d.mobile.slice(-10)}</a> | <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#a855f7;">Viber</a>` : `<span style="color:#888;">No mobile</span>`;
+      const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
+      m.bindPopup(`<div style="font-size:13.5px;max-width:460px;"><b style="font-size:17px;color:#ffd700;">${esc(d.station)}</b><br>Area: ${esc(d.area)}<br>Shift: ${esc(d.shift)}<br>Deployment: ${esc(d.type)}<br>Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:12px 0;"><div style="padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">${personnelHtml}<br>${mobileHtml}</div>${photo}</div>`, {maxWidth:500});
+      markers.push(m);
+      bounds.push([d.lat, d.lng]);
+    });
+
+    if (station === "All") {
+      map.setView(defaultView.center, defaultView.zoom, {animate: true});
+    } else if (bounds.length > 0) {
+      map.fitBounds(bounds, {padding: [50, 50], animate: true});
+    }
+  }
+
+  const crimes = station === "All" ? crimeData : crimeData.filter(c => c.station === station);
+  if (crimes.length > 0 && showCrimeMarkers) {
+    heatLayer = L.heatLayer(crimes.map(c => [c.lat, c.lng, 1]), {
+      radius: 30, blur: 22, maxZoom: 17,
+      gradient: {0.2: "#00ff00", 0.5: "#ffff00", 0.8: "#ff8000", 1.0: "#ff0000"}
+    }).addTo(map);
+
+    crimes.forEach(c => {
+      const m = L.marker([c.lat, c.lng], {icon: getCrimeIcon(c.crime)})
+        .bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
+        .addTo(map);
+      crimeMarkers.push(m);
+    });
+  }
+
+  document.getElementById("totalCount").textContent = filteredData.length;
+  document.getElementById("personnelTitle").textContent = station === "All" ? "List of Personnel" : `Personnel - ${station}`;
+  renderPersonnel(filteredData);
+  renderCrimes();
+}
+
+function renderPersonnel(data){ /* unchanged */ 
+  const tbody = document.querySelector("#personnelTable tbody"); tbody.innerHTML = "";
+  if(document.getElementById("station").value === "All"){
+    tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#999;padding:20px;'>Please select a station to view personnel</td></tr>";
+    return;
+  }
+  if(data.length===0){ tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#888;padding:20px;'>No personnel deployed</td></tr>"; return; }
+  data.forEach(p=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(p.leaderName)}</td>
+      <td>${p.mobile ? `<a href="viber://chat?number=%2B63${p.mobile.slice(-10)}">+63${p.mobile.slice(-10)}</a>` : "—"}</td>
+      <td>${esc(p.callsign)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCrimes(){ /* unchanged */ 
+  const tbody = document.querySelector("#crimeTable tbody"); tbody.innerHTML = "";
+  const st = document.getElementById("station").value;
+  if(st === "All"){
+    const counts = {}; crimeData.forEach(c=>counts[c.crime]=(counts[c.crime]||0)+1);
+    ["Murder","Homicide","Physical Injury","Rape","Robbery","Theft","Carnapping MC","Carnapping MV"].forEach(crime=>{
+      const n = counts[crime]||0;
+      tbody.innerHTML += `<tr style="opacity:${n?1:0.4}"><td>${crime}</td><td>All</td><td style="text-align:center;font-weight:bold;">${n}</td></tr>`;
+    });
+  }else{
+    const list = crimeData.filter(c=>c.station===st);
+    if(list.length===0){
+      tbody.innerHTML = "<tr><td colspan=3 style='text-align:center;color:#888;padding:20px;'>No crime data</td></tr>";
+    }else{
+      const map = {}; list.forEach(c=>{ const key = c.crime+"|"+c.brgy; map[key]=(map[key]||0)+1; });
+      Object.entries(map).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+        const [crime,brgy] = k.split("|");
+        tbody.innerHTML += `<tr><td>${esc(crime)}</td><td>${esc(brgy)}</td><td style="text-align:center;font-weight:bold;">${v}</td></tr>`;
+      });
+    }
+  }
+}
+
+document.getElementById("refresh").onclick = load;
+load();
+setInterval(load, 600000);
+</script>
+</body>
+</html>
