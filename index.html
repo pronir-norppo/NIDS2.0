@@ -162,7 +162,13 @@ const DEPLOY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSGa3PhKZX1
 const CRIME_URL  = "https://docs.google.com/spreadsheets/d/1ToFBmKsJ9uJDlbvKz1ImMfzrY2H1kIEMQpefxOolG9U/gviz/tq?tqx=out:csv&gid=0";
 const REALTIME_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3GS8teEaEBckvy2aOBOMGkLrOWwWJHKbob3FOl1fC9mAzoG5Y540LTeXk7d_KwGEu2SPg72wtUg1N/pub?output=csv";
 
-const SHIFT_MAP = { "1st Shift": "1st", "2nd Shift": "2nd", "3rd Shift": "3rd" };
+// === SHIFTS + ICON MAPPING ===
+const SHIFT_MAP = { 
+  "1st Shift": "1st", 
+  "2nd Shift": "2nd", 
+  "3rd Shift": "3rd",
+};
+
 const TYPE_MAP = {
   "beat": ["beat","foot","foot patrol","beat patrol"],
   "motorcycle": ["motorcycle","motorcycle patrol"],
@@ -171,17 +177,49 @@ const TYPE_MAP = {
   "border": ["border","border patrol"]
 };
 
-// Icons
+// Pre-load all icons
+
+function getIconForDeployment(shift, type) {
+  const lowerShift = (shift || "").toLowerCase().trim();
+
+  // SPECIAL CASE: Until the end of the tour of duty → always use single icon
+  if (lowerShift.includes("until the end") || lowerShift.includes("end of the tour")) {
+    return ICONS["Until the end of the tour of duty"];
+  }
+
+  const lowerType = type.toLowerCase();
+  let shiftKey = Object.keys(SHIFT_MAP).find(s => lowerShift.includes(s.toLowerCase()));
+  if (!shiftKey) return ICONS["default"];
+
+  let iconKey = null;
+  if (TYPE_MAP.beat.some(t => lowerType.includes(t))) iconKey = "beat";
+  else if (TYPE_MAP.motorcycle.some(t => lowerType.includes(t))) iconKey = "motorcycle";
+  else if (TYPE_MAP.mobile.some(t => lowerType.includes(t))) iconKey = "mobile";
+  else if (TYPE_MAP.checkpoint.some(t => lowerType.includes(t))) iconKey = "checkpoint";
+  else if (TYPE_MAP.border.some(t => lowerType.includes(t))) iconKey = "border";
+  else if (lowerType.includes("stationed")) return ICONS["stationed"];
+
+  return ICONS[`${shiftKey}|${iconKey}`] || ICONS["default"];
+}
+
 const ICONS = {};
 Object.entries(SHIFT_MAP).forEach(([shiftName, folder]) => {
-  ICONS[`${shiftName}|beat`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Beat_Patrol.png`,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
+  ICONS[`${shiftName}|beat`]       = L.icon({iconUrl:`${ICON_BASE}${folder}_Beat_Patrol.png`,       iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
   ICONS[`${shiftName}|motorcycle`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Motorcycle_Patrol.png`,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
-  ICONS[`${shiftName}|mobile`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Mobile_Patrol.png`,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
-  ICONS[`${shiftName}|checkpoint`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Checkpoint.png`,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
-  ICONS[`${shiftName}|border`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Border_Patrol.png`,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
+  ICONS[`${shiftName}|mobile`]     = L.icon({iconUrl:`${ICON_BASE}${folder}_Mobile_Patrol.png`,    iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
+  ICONS[`${shiftName}|checkpoint`] = L.icon({iconUrl:`${ICON_BASE}${folder}_Checkpoint.png`,       iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
+  ICONS[`${shiftName}|border`]      = L.icon({iconUrl:`${ICON_BASE}${folder}_Border_Patrol.png`,   iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-40]});
 });
-ICONS["default"] = L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/default.png",iconSize:[32,32],iconAnchor:[16,32]});
-ICONS["stationed"] = L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png",iconSize:[36,36],iconAnchor:[18,36]});
+
+ICONS["Until the end of the tour of duty"] = L.icon({
+  iconUrl: "https://pronir-norppo.github.io/NIDS2.0/icons/new/end_of_duty.png",
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40]
+});
+
+ICONS["default"]   = L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/new/end_of_duty.png",   iconSize:[40,40],iconAnchor:[20,40]});
+ICONS["stationed"] = L.icon({iconUrl:"https://pronir-norppo.github.io/NIDS2.0/icons/stationed.png", iconSize:[36,36],iconAnchor:[18,36]});
 
 let allData = [], crimeData = [], realtimeData = [];
 let markers = [], crimeMarkers = [], realtimeMarkers = [], heatLayer = null;
@@ -202,7 +240,7 @@ function parseCoords(row){ let str = robustGet(row,["latitude","lat_long","coord
 function getMobileNumber(row){ let raw = robustGet(row,["Contact Number","contact number","contact","mobile","phone"]); if(!raw) return ""; let m = raw.replace(/\D/g,""); if(m.startsWith("0")) m = "63" + m.slice(1); return (m.length >= 10) ? m : ""; }
 function parseLatLong(str){ if(!str) return null; const parts = str.replace(/[^\d\.\,\-\s]/g,'').split(/[\s\,\;\|\/]+/).map(parseFloat).filter(n=>!isNaN(n)); if(parts.length >= 2) return {lat:parts[0], lng:parts[1]}; return null; }
 
-function getCrimeIcon(crime){ /* unchanged - keep your existing one */ 
+function getCrimeIcon(crime){ 
   const map = {"Murder":"fa-skull-crossbones","Homicide":"fa-skull","Physical Injury":"fa-hand-fist","Rape":"fa-ban","Robbery":"fa-mask","Theft":"fa-sack-dollar","Carnapping MC":"fa-motorcycle","Carnapping MV":"fa-car"};
   const cls = map[crime] || "fa-triangle-exclamation";
   return L.divIcon({html:`<span class="fa-stack" style="font-size:12px;"><i class="fas fa-circle fa-stack-2x" style="color:#000;opacity:0.7;"></i><i class="fas ${cls} fa-stack-1x fa-inverse" style="color:#ff0044;"></i></span>`,className:"",iconSize:[28,28],iconAnchor:[14,28]});
@@ -252,7 +290,7 @@ async function load(){
     const cri = Papa.parse(crimeCsv, {header:true, skipEmptyLines:true}).data;
     const rtRaw = Papa.parse(realtimeCsv, {header:true, skipEmptyLines:true}).data;
 
-    // Deployment data (unchanged)
+    // Deployment data
     allData = dep.map(r => {
       const coords = parseCoords(r); if (!coords) return null;
       let rawPersonnel = robustGet(r,["Personnel (Rank_FName_MI_LName (Contact#)","Personnel","personnel","Team","leader"]);
@@ -272,19 +310,22 @@ async function load(){
       };
     }).filter(Boolean);
 
-    // 8 Focus Crimes (unchanged)
-    crimeData = cri.filter(r => {
-      let crime = robustGet(r,["focus crimes","crime","offense"]) || "";
-      let coordStr = robustGet(r,["lat long","lat_long","coordinates","latlong","location"]);
-      let coords = parseLatLong(coordStr);
-      return coords && crime;
-    }).map(r => ({
-      station: robustGet(r,["station"]) || "Unknown",
-      crime: robustGet(r,["focus crimes","crime","offense"]).trim(),
-      brgy: robustGet(r,["barangay","brgy"]) || "",
-      lat: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lat,
-      lng: parseLatLong(robustGet(r,["lat long","lat_long","coordinates","latlong","location"])).lng
-    }));
+    // 8 Focus Crimes
+    crimeData = cri.map(row => {
+      const coordStr = robustGet(row, ["lat long", "lat_long", "coordinates", "latlong", "location"]) || "";
+      const coords = parseLatLong(coordStr);
+      if (!coords) return null;
+
+      return {
+        station: robustGet(row, ["station", "unit"]) || "Unknown",
+        crime:   robustGet(row, ["focus crimes", "crime", "offense", "focus crime"]).trim() || "Unknown Crime",
+        brgy:    robustGet(row, ["barangay", "brgy"]) || "—",
+        date:    robustGet(row, ["date committed", "date_committed", "date"]) || "Not recorded",
+        time:    robustGet(row, ["time committed", "time_committed", "time"]) || "Not recorded",
+        lat: coords.lat,
+        lng: coords.lng
+      };
+    }).filter(Boolean);
 
     // REALTIME LIVE REPORTS
     realtimeData = rtRaw.map(row => {
@@ -426,52 +467,55 @@ function applyFilters(){
 
     crimes.forEach(c => {
       const m = L.marker([c.lat, c.lng], {icon: getCrimeIcon(c.crime)})
-        .bindPopup(`<h2>${esc(c.crime)} Incident</h2>Brgy: ${esc(c.brgy)}<br>Station: ${esc(c.station)}`)
+        .bindPopup(`
+          <div style="font-size:14.5px; line-height:1.7; color:#eee;">
+            <h2 style="margin:0 0 14px; color:#ff4444; font-size:19px; font-weight:bold;">
+              ${esc(c.crime.toUpperCase())}
+            </h2>
+            <b>Station:</b> ${esc(c.station)}<br>
+			<b>Barangay:</b> ${esc(c.brgy)}<br>
+            <b>Date Committed:</b> ${esc(c.date)}<br>
+            <b>Time Committed:</b> ${esc(c.time)}<br>
+
+          </div>
+        `, {maxWidth: 360})
         .addTo(map);
       crimeMarkers.push(m);
     });
   }
 
     // LIVE REPORTS – FILTERED BY STATION
-  if (showRealtime) {
+if (showRealtime) {
     const rtIcon = getRealtimeIcon();
-    const selectedStation = station.trim();  // "Guihulngan CPS" from dropdown
+    const selectedStation = station.trim();
 
     realtimeData.forEach(r => {
-      // Clean both sides aggressively
       const reportStation = (r.station || "").toString().trim();
 
-      // Direct match OR fuzzy fallback
       if (station !== "All" && reportStation !== selectedStation) {
-        // Extra safety: also match if one contains the other (e.g. "Guihulngan CPS " vs "Guihulngan CPS")
         if (!reportStation.includes(selectedStation) && !selectedStation.includes(reportStation)) {
-          return; // skip this marker
+          return;
         }
       }
 
       const m = L.marker([r.lat, r.lng], {icon: rtIcon}).addTo(map);
 
-      const photoHtml = r.photoId ?
-        `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${r.photoId}&sz=w1000" style="border-radius:12px;margin-top:12px;"></div>` :
-        '<div style="color:#666;font-style:italic;margin-top:12px;">No photo attached</div>';
-
       m.bindPopup(`
         <div class="card" style="background:var(--card);padding:18px;border-radius:14px;border:2px solid var(--live);max-width:420px;">
-          <h2 style="margin:0 0 16px;color:var(--live);text-align:center;">LIVE INCIDENT REPORT</h2>
+          <h2 style="margin:0 0 16px;color:var(--live);text-align:center;font-size:18px;">
+            LIVE INCIDENT REPORT
+          </h2>
           <table style="width:100%;font-size:13.5px;">
             <thead><tr><th style="color:#ffd700;text-align:left;">Field</th><th style="color:#ffd700;text-align:left;">Details</th></tr></thead>
             <tbody>
               <tr><td><b>Incident</b></td><td>${esc(r.offense)}</td></tr>
-              <tr><td><b>Date / Time</b></td><td>${esc(r.date)} ${esc(r.time)}</td></tr>
-              <tr><td><b>Location</b></td><td>Brgy. ${esc(r.brgy)}, ${esc(r.place)}</td></tr>
-              <tr><td><b>Victim</b></td><td>${esc(r.victim)}</td></tr>
-              <tr><td><b>Suspect</b></td><td>${esc(r.suspect)}</td></tr>
-              <tr><td><b>Reported by</b></td><td>${esc(r.reporter)}</td></tr>
               <tr><td><b>Station</b></td><td>${esc(reportStation)}</td></tr>
-              <tr><td><b>Received</b></td><td>${esc(r.timestamp)}</td></tr>
+              <tr><td><b>Time / Date</b></td><td>${esc(r.time)} ${esc(r.date)}</td></tr>
+              <tr><td><b>Location</b></td><td>${esc(r.place)} in Brgy. ${esc(r.brgy)}</td></tr>
+              <tr><td><b>Victim/s</b></td><td>${esc(r.victim)}</td></tr>
+              <tr><td><b>Suspect/s</b></td><td>${esc(r.suspect)}</td></tr>
             </tbody>
           </table>
-          ${photoHtml}
         </div>
       `, {maxWidth: 460});
 
