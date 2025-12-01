@@ -227,6 +227,12 @@ let showDeployment = true, showCrimeMarkers = true, showRealtime = true;
 const defaultView = { center: [9.7457322, 122.9943032], zoom: 9 };
 let lastLoadTime = null;
 
+// GLOBAL POPUP FIX — PERFECT CENTERING & NO OVERFLOW
+L.Marker.prototype.options.popupAnchor = [0, -42];
+L.Popup.prototype.options.maxWidth = 380;
+L.Popup.prototype.options.minWidth = 320;
+L.Popup.prototype.options.autoPanPadding = [10, 70];
+
 const map = L.map('map').setView(defaultView.center, defaultView.zoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© NOrPPO'}).addTo(map);
 
@@ -434,7 +440,26 @@ function applyFilters(){
       const personnelHtml = d.personnelList.map(name => `<b>${esc(name)}</b>`).join("<br>");
       const mobileHtml = d.mobile ? `<a href="tel:+63${d.mobile.slice(-10)}" style="color:#00ffff;">+63${d.mobile.slice(-10)}</a> | <a href="viber://chat?number=%2B63${d.mobile.slice(-10)}" style="color:#a855f7;">Viber</a>` : `<span style="color:#888;">No mobile</span>`;
       const photo = d.photoId ? `<div class="popup-photo"><img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w1200"></div>` : "";
-      m.bindPopup(`<div style="font-size:13.5px;max-width:460px;"><b style="font-size:17px;color:#ffd700;">${esc(d.station)}</b><br>Area: ${esc(d.area)}<br>Shift: ${esc(d.shift)}<br>Deployment: ${esc(d.type)}<br>Callsign: <b>${esc(d.callsign)}</b><hr style="border:0;border-top:1px solid #444;margin:12px 0;"><div style="padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">${personnelHtml}<br>${mobileHtml}</div>${photo}</div>`, {maxWidth:500});
+          m.bindPopup(`
+      <div style="font-size:13.5px; max-width:340px; width:340px; line-height:1.5;">
+        <b style="font-size:17px; color:#ffd700; display:block; margin-bottom:8px;">
+          ${esc(d.station)}
+        </b>
+        <b>Area:</b> ${esc(d.area)}<br>
+        <b>Shift:</b> ${esc(d.shift)}<br>
+        <b>Deployment:</b> ${esc(d.type)}<br>
+        <b>Callsign:</b> <span style="color:#00ffff;">${esc(d.callsign)}</span>
+        <hr style="border:0; border-top:1px solid #444; margin:10px 0;">
+        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; font-size:13px;">
+          ${personnelHtml}<br><br>
+          ${mobileHtml}
+        </div>
+        ${photo ? `<div style="margin-top:12px; text-align:center;">
+          <img src="https://drive.google.com/thumbnail?id=${d.photoId}&sz=w800" 
+               style="max-width:100%; height:auto; border-radius:8px; border:1px solid #444;">
+        </div>` : ""}
+      </div>
+    `, { maxWidth: 380, offset: [0, -10] });
       markers.push(m);
       bounds.push([d.lat, d.lng]);
     });
@@ -500,24 +525,26 @@ if (showRealtime) {
 
       const m = L.marker([r.lat, r.lng], {icon: rtIcon}).addTo(map);
 
-      m.bindPopup(`
-        <div class="card" style="background:var(--card);padding:18px;border-radius:14px;border:2px solid var(--live);max-width:420px;">
-          <h2 style="margin:0 0 16px;color:var(--live);text-align:center;font-size:18px;">
+            m.bindPopup(`
+        <div class="card" style="background:var(--card); padding:18px; border-radius:14px; 
+                                border:2px solid var(--live); max-width:340px; width:340px; font-size:13.5px;">
+          <h2 style="margin:0 0 16px; color:var(--live); text-align:center; font-size:17px;">
             LIVE INCIDENT REPORT
           </h2>
-          <table style="width:100%;font-size:13.5px;">
-            <thead><tr><th style="color:#ffd700;text-align:left;">Field</th><th style="color:#ffd700;text-align:left;">Details</th></tr></thead>
+          <table style="width:100%; border-collapse:collapse;">
             <tbody>
-              <tr><td><b>Incident</b></td><td>${esc(r.offense)}</td></tr>
-              <tr><td><b>Station</b></td><td>${esc(reportStation)}</td></tr>
-              <tr><td><b>Time / Date</b></td><td>${esc(r.time)} ${esc(r.date)}</td></tr>
-              <tr><td><b>Location</b></td><td>${esc(r.place)} in Brgy. ${esc(r.brgy)}</td></tr>
-              <tr><td><b>Victim/s</b></td><td>${esc(r.victim)}</td></tr>
-              <tr><td><b>Suspect/s</b></td><td>${esc(r.suspect)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Incident</b></td><td>${esc(r.offense)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Date/Time</b></td><td>${esc(r.date)} ${esc(r.time)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Location</b></td><td>Brgy. ${esc(r.brgy)}, ${esc(r.place)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Victim</b></td><td>${esc(r.victim)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Suspect</b></td><td>${esc(r.suspect)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Reported by</b></td><td>${esc(r.reporter)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Station</b></td><td>${esc(reportStation)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Received</b></td><td>${esc(r.timestamp)}</td></tr>
             </tbody>
           </table>
         </div>
-      `, {maxWidth: 460});
+      `, { maxWidth: 380, offset: [0, -10] });
 
       realtimeMarkers.push(m);
     });
