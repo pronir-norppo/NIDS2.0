@@ -271,10 +271,17 @@ function getIconForDeployment(shift, type) {
 function getRealtimeIcon() {
   return L.divIcon({
     html: `
-      <div style="font-size:38px; filter: drop-shadow(0 0 12px var(--live)) drop-shadow(0 0 16px var(--live)); animation:glow 1.8s infinite alternate;">
-        <i class="fas fa-bell" style="color:var(--live);"></i>
+      <div style="font-size:40px; 
+                  filter: drop-shadow(0 0 14px #ff0000) drop-shadow(0 0 20px #ff0000);
+                  animation: pulse 1.6s infinite alternate;">
+        <i class="fas fa-bell" style="color:#ff0000; filter: drop-shadow(0 0 8px #ff0000);"></i>
       </div>
-      <style>@keyframes glow{from{transform:scale(1)}to{transform:scale(1.25)}}</style>
+      <style>
+        @keyframes pulse {
+          from { transform: scale(1); opacity: 0.9; }
+          to   { transform: scale(1.3); opacity: 1; }
+        }
+      </style>
     `,
     className: "realtime-icon",
     iconSize: [32,32],
@@ -528,19 +535,17 @@ if (showRealtime) {
             m.bindPopup(`
         <div class="card" style="background:var(--card); padding:18px; border-radius:14px; 
                                 border:2px solid var(--live); max-width:340px; width:340px; font-size:13.5px;">
-          <h2 style="margin:0 0 16px; color:var(--live); text-align:center; font-size:17px;">
-            LIVE INCIDENT REPORT
-          </h2>
+          <span style="color:#ff0000;font-weight:700; text-shadow: 0 0 8px #ff0000;">Live Incident Reports</span>
           <table style="width:100%; border-collapse:collapse;">
             <tbody>
-              <tr><td style="padding:4px 0;"><b>Incident</b></td><td>${esc(r.offense)}</td></tr>
-              <tr><td style="padding:4px 0;"><b>Date/Time</b></td><td>${esc(r.date)} ${esc(r.time)}</td></tr>
-              <tr><td style="padding:4px 0;"><b>Location</b></td><td>Brgy. ${esc(r.brgy)}, ${esc(r.place)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Station</b></td><td>${esc(reportStation)}</td></tr>
+			  <tr><td style="padding:4px 0;"><b>Incident</b></td><td>${esc(r.offense)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Date/Time</b></td><td>${esc(r.time)}, ${esc(r.date)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Location</b></td><td>${esc(r.place)} in Brgy. ${esc(r.brgy)}</td></tr>
               <tr><td style="padding:4px 0;"><b>Victim</b></td><td>${esc(r.victim)}</td></tr>
               <tr><td style="padding:4px 0;"><b>Suspect</b></td><td>${esc(r.suspect)}</td></tr>
               <tr><td style="padding:4px 0;"><b>Reported by</b></td><td>${esc(r.reporter)}</td></tr>
-              <tr><td style="padding:4px 0;"><b>Station</b></td><td>${esc(reportStation)}</td></tr>
-              <tr><td style="padding:4px 0;"><b>Received</b></td><td>${esc(r.timestamp)}</td></tr>
+              <tr><td style="padding:4px 0;"><b>Remarks</b></td><td><b>This incident report was sent to PTOC email at ${esc(r.timestamp)}.</b></td><td>${esc(r.timestamp)}</td></tr>
             </tbody>
           </table>
         </div>
